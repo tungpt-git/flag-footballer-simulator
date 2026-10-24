@@ -10,11 +10,16 @@ const EPSILON = 1e-9;
 export const vec = (x: number, y: number): Vec2 => ({ x, y });
 export const add = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x + b.x, y: a.y + b.y });
 export const sub = (a: Vec2, b: Vec2): Vec2 => ({ x: a.x - b.x, y: a.y - b.y });
-export const scale = (a: Vec2, factor: number): Vec2 => ({ x: a.x * factor, y: a.y * factor });
+export const scale = (a: Vec2, factor: number): Vec2 => ({
+  x: a.x * factor,
+  y: a.y * factor,
+});
 export const dot = (a: Vec2, b: Vec2): number => a.x * b.x + a.y * b.y;
 export const length = (a: Vec2): number => Math.hypot(a.x, a.y);
-export const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
-export const lerp = (a: number, b: number, t: number): number => a + (b - a) * t;
+export const distance = (a: Vec2, b: Vec2): number =>
+  Math.hypot(a.x - b.x, a.y - b.y);
+export const lerp = (a: number, b: number, t: number): number =>
+  a + (b - a) * t;
 export const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
@@ -25,7 +30,11 @@ export const normalize = (a: Vec2): Vec2 => {
 };
 
 /** Move `current` toward `target` by at most `maxDelta` (vector-wise). */
-export const moveToward = (current: Vec2, target: Vec2, maxDelta: number): Vec2 => {
+export const moveToward = (
+  current: Vec2,
+  target: Vec2,
+  maxDelta: number,
+): Vec2 => {
   const delta = sub(target, current);
   const magnitude = length(delta);
   if (magnitude <= maxDelta) return { ...target };
@@ -53,9 +62,15 @@ export type Path = {
 export const buildPath = (points: Vec2[]): Path => {
   const cumulative: number[] = [0];
   for (let index = 1; index < points.length; index += 1) {
-    cumulative.push(cumulative[index - 1] + distance(points[index - 1], points[index]));
+    cumulative.push(
+      cumulative[index - 1] + distance(points[index - 1], points[index]),
+    );
   }
-  return { points, cumulative, totalLength: cumulative[cumulative.length - 1] ?? 0 };
+  return {
+    points,
+    cumulative,
+    totalLength: cumulative[cumulative.length - 1] ?? 0,
+  };
 };
 
 /** Index of the segment containing `arcDistance` (clamped to the path). */
@@ -69,8 +84,10 @@ const findSegmentIndex = (path: Path, arcDistance: number): number => {
 
 export const pointAtDistance = (path: Path, arcDistance: number): Vec2 => {
   if (path.points.length === 0) return { x: 0, y: 0 };
-  if (path.points.length === 1 || arcDistance <= 0) return { ...path.points[0] };
-  if (arcDistance >= path.totalLength) return { ...path.points[path.points.length - 1] };
+  if (path.points.length === 1 || arcDistance <= 0)
+    return { ...path.points[0] };
+  if (arcDistance >= path.totalLength)
+    return { ...path.points[path.points.length - 1] };
 
   const index = findSegmentIndex(path, arcDistance);
   const segmentLength = path.cumulative[index + 1] - path.cumulative[index];
@@ -90,8 +107,11 @@ export const directionAtDistance = (path: Path, arcDistance: number): Vec2 => {
 };
 
 /** Turn angle in degrees (0 = straight on, 180 = full reversal) at an interior vertex. */
-export const turnAngleDeg = (previous: Vec2, current: Vec2, next: Vec2): number =>
-  angleBetweenDeg(sub(current, previous), sub(next, current));
+export const turnAngleDeg = (
+  previous: Vec2,
+  current: Vec2,
+  next: Vec2,
+): number => angleBetweenDeg(sub(current, previous), sub(next, current));
 
 // ---------- Pursuit ----------
 

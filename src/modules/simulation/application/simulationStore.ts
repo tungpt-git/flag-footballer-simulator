@@ -26,7 +26,7 @@ import {
   previewReceiverThrow,
   stepSimulation,
 } from "../domain/simulation";
-import { buildTeamSimulationConfig } from "../domain/teamPlay";
+import { assignOpenTeamSlots, buildTeamSimulationConfig, EMPTY_TEAM_LINEUP, type TeamLineup, type TeamSlot } from "../domain/teamPlay";
 import { CALL_LABELS, OUTCOME_LABELS, OUTCOME_TONES } from "../domain/labels";
 import type { Tone } from "@/shared/kernel/tone";
 
@@ -62,6 +62,8 @@ type SimulationStore = {
   players: PlayerProfile[];
   routes: Route[];
   lineup: Lineup;
+  /** Shared 5-on-5 roster. Every play uses these same spots. */
+  teamLineup: TeamLineup;
   routeId: string | null;
   /** Set while the simulator is running a 5-on-5 call. Cleared when a single route is chosen. */
   offensivePlayId: string | null;
@@ -81,6 +83,7 @@ type SimulationStore = {
   setMode: (mode: SimulationMode) => void;
   setCategory: (category: PlayCategory) => void;
   setLineupPlayer: (role: LineupRole, playerId: string | null) => void;
+  setTeamPlayer: (slot: TeamSlot, playerId: string) => void;
   setRouteId: (routeId: string) => void;
   setOffensivePlayId: (offensivePlayId: string | null) => void;
   setDefensivePlayId: (defensivePlayId: DefensivePlayId) => void;
@@ -111,7 +114,17 @@ export const getAlignmentX = (side: AlignmentSide): number =>
 export const buildSimulationConfig = (
   store: Pick<
     SimulationStore,
-    "mode" | "category" | "players" | "routes" | "lineup" | "routeId" | "offensivePlayId" | "defensivePlayId" | "trigger" | "alignmentSide"
+    | "mode"
+    | "category"
+    | "players"
+    | "routes"
+    | "lineup"
+    | "teamLineup"
+    | "routeId"
+    | "offensivePlayId"
+    | "defensivePlayId"
+    | "trigger"
+    | "alignmentSide"
   >,
   seed: number,
 ): SimulationConfig | null => {
@@ -120,12 +133,10 @@ export const buildSimulationConfig = (
     return buildTeamSimulationConfig({
       play,
       players: store.players,
+      teamLineup: store.teamLineup,
       mode: store.mode,
       category: store.category,
       defensivePlayId: store.defensivePlayId,
-      quarterback: findPlayer(store.players, store.lineup.quarterbackId) ?? DEFAULT_QUARTERBACK,
-      cornerback: findPlayer(store.players, store.lineup.cornerbackId) ?? DEFAULT_CORNERBACK,
-      rusher: findPlayer(store.players, store.lineup.rusherId) ?? DEFAULT_RUSHER,
       seed,
     });
   }
@@ -186,6 +197,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     players: [],
     routes: [],
     lineup: { receiverId: null, quarterbackId: null, cornerbackId: null, rusherId: null },
+    teamLineup: EMPTY_TEAM_LINEUP,
     routeId: null,
     offensivePlayId: null,
     defensivePlayId: DEFAULT_DEFENSIVE_PLAY_ID,
@@ -201,7 +213,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     eventLog: [],
 
     loadCatalog: (players, routes) => {
-      const { lineup, routeId } = get();
+      const { lineup, teamLineup, routeId } = get();
       const keepOrPick = (currentId: string | null, position: PlayerProfile["position"]): string | null =>
         findPlayer(players, currentId)?.id ?? pickFirstOfPosition(players, position);
 
@@ -214,6 +226,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           cornerbackId: keepOrPick(lineup.cornerbackId, "DB"),
           rusherId: keepOrPick(lineup.rusherId, "RUSHER"),
         },
+        teamLineup: assignOpenTeamSlots(players, teamLineup),
         routeId: routes.find((route) => route.id === routeId)?.id ?? routes[0]?.id ?? null,
       });
     },
@@ -221,6 +234,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     setMode: (mode) => rebuild({ mode }),
     setCategory: (category) => rebuild({ category }),
     setLineupPlayer: (role, playerId) => rebuild({ lineup: { ...get().lineup, [role]: playerId } }),
+    setTeamPlayer: (slot, playerId) => rebuild({ teamLineup: { ...get().teamLineup, [slot]: playerId } }),
     setRouteId: (routeId) => rebuild({ routeId, offensivePlayId: null }),
     setOffensivePlayId: (offensivePlayId) => rebuild({ offensivePlayId }),
     setDefensivePlayId: (defensivePlayId) => rebuild({ defensivePlayId }),

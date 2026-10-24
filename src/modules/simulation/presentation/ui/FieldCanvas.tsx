@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import type { Position } from "@/modules/roster";
 import { Minus, Plus, ScanLine } from "lucide-react";
 import { Button } from "@/shared/ui/primitives/button";
 import { usePrefersReducedMotion } from "@/shared/ui/hooks/usePrefersReducedMotion";
@@ -29,8 +30,10 @@ import {
   type FieldView,
 } from "../../infrastructure/rendering/fieldMetrics";
 import { OUTCOME_LABELS } from "../../domain/labels";
-import { useSimulationStore } from "../../application/simulationStore";
+import { useSimulationStore, type LineupRole } from "../../application/simulationStore";
 import { useStageUiStore } from "../../application/stageUiStore";
+import { getTeamSlotPosition, teamSlotForEntity, teamSlotLabel, type TeamSlot } from "../../domain/teamPlay";
+import { FieldRosterMenu } from "./FieldRosterMenu";
 
 const FIELD_PADDING_PX = 16;
 const MIN_CANVAS_SIZE_PX = 200;
@@ -40,6 +43,68 @@ const PAN_STEP_YD = 3;
 const DRAG_THRESHOLD_PX = 4;
 
 type Size = { width: number; height: number };
+
+type RosterAnchor = {
+  x: number;
+  y: number;
+  entityId: string;
+  title: string;
+  position: Position;
+} & ({ kind: "team"; slot: TeamSlot } | { kind: "lineup"; role: LineupRole });
+
+const LINEUP_ROLE_FOR_ENTITY: Record<string, LineupRole> = {
+  receiver: "receiverId",
+  qb: "quarterbackId",
+  cornerback: "cornerbackId",
+  rusher: "rusherId",
+};
+
+const LINEUP_POSITION: Record<LineupRole, Position> = {
+  receiverId: "WR",
+  quarterbackId: "QB",
+  cornerbackId: "DB",
+  rusherId: "RUSHER",
+};
+
+const LINEUP_LABEL: Record<LineupRole, string> = {
+  receiverId: "Receiver",
+  quarterbackId: "Quarterback",
+  cornerbackId: "Defender",
+  rusherId: "Rusher",
+};
+
+/** Which roster spot a field symbol stands for, plus where to draw its player list. */
+const describeRosterAnchor = (entityId: string, point: { x: number; y: number }): RosterAnchor | null => {
+  const { sim } = useSimulationStore.getState();
+  if (!sim) return null;
+
+  if (sim.config.teamPlay) {
+    const slot = teamSlotForEntity(entityId);
+    if (!slot) return null;
+    const routeName = sim.config.teamPlay.runners.find((runner) => runner.id === entityId || `db-${runner.id}` === entityId)?.routeName;
+    return {
+      kind: "team",
+      slot,
+      entityId,
+      x: point.x,
+      y: point.y + 14,
+      title: teamSlotLabel(slot, routeName),
+      position: getTeamSlotPosition(slot),
+    };
+  }
+
+  const role = LINEUP_ROLE_FOR_ENTITY[entityId];
+  if (!role) return null;
+  return {
+    kind: "lineup",
+    role,
+    entityId,
+    x: point.x,
+    y: point.y + 14,
+    title: LINEUP_LABEL[role],
+    position: LINEUP_POSITION[role],
+  };
+};
 
 const TEAM_ROUTE_COLOR: Record<string, string> = {
   X: CANVAS_COLORS.routeX,
@@ -87,7 +152,7 @@ const buildAriaLabel = (sim: SimulationState | null): string => {
   if (!sim) return "Flag football field. Select a receiver and a route to begin.";
   if (sim.config.teamPlay) {
     const calls = sim.config.teamPlay.runners.map((runner) => `${runner.id} ${runner.routeName}`).join(", ");
-    const base = `Top-down flag football field: ${sim.config.teamPlay.playName}. ${calls}.`;
+    const base = `Top-down flag football field: ${sim.config.teamPlay.playName}. ${calls}. Click a player to choose who lines up there.`;
     if (sim.phase === "PAUSED_FOR_DECISION") return `${base} Play paused, waiting for your decision.`;
     if (sim.phase === "FINISHED" && sim.outcome) return `${base} Result: ${OUTCOME_LABELS[sim.outcome.result]}.`;
     if (sim.phase === "FINISHED") return `${base} Play complete.`;
@@ -115,6 +180,7 @@ export const FieldCanvas = () => {
   const dragRef = useRef<{ startX: number; startY: number; lastX: number; lastY: number; hasMoved: boolean } | null>(null);
   const [size, setSize] = useState<Size>({ width: 0, height: 0 });
   const [zoom, setZoom] = useState(DEFAULT_FIELD_VIEW.zoom);
+  const [rosterAnchor, setRosterAnchor] = useState<RosterAnchor | null>(null);
   const isReducedMotion = usePrefersReducedMotion();
 
   const viewMode = useSimulationStore((state) => state.viewMode);
@@ -127,6 +193,28 @@ export const FieldCanvas = () => {
     return Math.max(PLAY_VIEW_BEHIND_LOS_YD, line - deepestBack + 2);
   });
   const ariaLabel = useSimulationStore((state) => buildAriaLabel(state.sim));
+  const players = useSimulationStore((state) => state.players);
+  const teamLineup = useSimulationStore((state) => state.teamLineup);
+  const lineup = useSimulationStore((state) => state.lineup);
+  const offensivePlayId = useSimulationStore((state) => state.offensivePlayId);
+  const selectedRosterId = rosterAnchor
+    ? rosterAnchor.kind === "team"
+      ? teamLineup[rosterAnchor.slot]
+      : lineup[rosterAnchor.role]
+    : null;
+
+  const handleCloseRoster = useCallback((): void => setRosterAnchor(null), []);
+  const handleRosterSelect = (playerId: string): void => {
+    if (!rosterAnchor) return;
+    const store = useSimulationStore.getState();
+    if (rosterAnchor.kind === "team") store.setTeamPlayer(rosterAnchor.slot, playerId);
+    else store.setLineupPlayer(rosterAnchor.role, playerId);
+    setRosterAnchor(null);
+  };
+
+  useEffect(() => {
+    setRosterAnchor(null);
+  }, [offensivePlayId]);
 
   const applyView = useCallback(
     (nextView: FieldView): void => {
@@ -274,13 +362,23 @@ export const FieldCanvas = () => {
   const handlePointerUp = (event: React.PointerEvent<HTMLCanvasElement>): void => {
     const drag = dragRef.current;
     dragRef.current = null;
-    if (!drag || drag.hasMoved) return;
+    if (!drag || drag.hasMoved) {
+      if (drag?.hasMoved) setRosterAnchor(null);
+      return;
+    }
 
     const { sim } = useSimulationStore.getState();
     const transform = transformRef.current;
     if (!sim || !transform) return;
-    const hit = findEntityAt(transform, sim, getPointerPoint(event));
-    if (hit) useStageUiStore.getState().selectEntity(hit.id);
+    const point = getPointerPoint(event);
+    const hit = findEntityAt(transform, sim, point);
+    if (!hit) {
+      setRosterAnchor(null);
+      return;
+    }
+
+    useStageUiStore.getState().selectEntity(hit.id);
+    setRosterAnchor((current) => (current?.entityId === hit.id ? null : describeRosterAnchor(hit.id, point)));
   };
 
   const handlePointerLeave = (): void => useStageUiStore.getState().hoverEntity(null);
@@ -290,6 +388,7 @@ export const FieldCanvas = () => {
   const handleFit = (): void => applyView(DEFAULT_FIELD_VIEW);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>): void => {
+    if (event.target !== event.currentTarget) return;
     const view = viewRef.current;
     const handlers: Record<string, () => void> = {
       "+": handleZoomIn,
@@ -328,7 +427,23 @@ export const FieldCanvas = () => {
         className={cn("block", zoom > MIN_ZOOM && "touch-none")}
       />
 
-      <div role="group" aria-label="Zoom controls" className="absolute right-3 bottom-3 flex flex-col overflow-hidden rounded-lg border border-border bg-popover/90 shadow-raised backdrop-blur">
+      {rosterAnchor && (
+        <FieldRosterMenu
+          x={rosterAnchor.x}
+          y={rosterAnchor.y}
+          boundsWidth={size.width}
+          boundsHeight={size.height}
+          title={rosterAnchor.title}
+          players={players}
+          position={rosterAnchor.position}
+          selectedId={selectedRosterId}
+          fieldRef={canvasRef}
+          onSelect={handleRosterSelect}
+          onClose={handleCloseRoster}
+        />
+      )}
+
+      <div role="group" aria-label="Zoom controls" className="absolute right-3 bottom-3 z-30 flex flex-col overflow-hidden rounded-lg border border-border bg-popover/90 shadow-raised backdrop-blur">
         <Button variant="ghost" size="icon-sm" onClick={handleZoomIn} disabled={zoom >= MAX_ZOOM} aria-label="Zoom in" className="rounded-none">
           <Plus aria-hidden="true" />
         </Button>

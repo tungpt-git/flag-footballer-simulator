@@ -1,12 +1,12 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { LabeledSelect, type SelectOption } from "@/shared/ui/primitives/labeled-select";
 import { DEFAULT_LOS_Y } from "@/shared/kernel/field";
 import { createRunnerRuntime, estimateRouteDurationSec } from "../../domain/movement";
 import { canPlayPosition, dashToMetersPerSecond, type PlayerProfile, type Position } from "@/modules/roster";
-import { OFFENSIVE_PLAYS, getFormation, resolveRoutePoints } from "@/modules/playbook";
+import { OFFENSIVE_PLAYS, getFormation, resolveRoutePoints, type SkillPosition } from "@/modules/playbook";
 import { RouteThumbnail } from "@/modules/playbook/ui";
 import { DEFENSIVE_PLAYS, getDefensivePlay, type DefensivePlayId } from "../../domain/defensivePlays";
 import { CATEGORY_LABELS, TRIGGER_LABELS } from "../../domain/labels";
@@ -18,6 +18,7 @@ import {
   type AlignmentSide,
   type LineupRole,
 } from "../../application/simulationStore";
+import { TeamLineupForm } from "./TeamLineupForm";
 
 const CATEGORY_OPTIONS: PlayCategory[] = ["OFFENSE", "DEFENSE"];
 
@@ -110,7 +111,6 @@ export const SetupPanel = () => {
   const trigger = useSimulationStore((state) => state.trigger);
   const alignmentSide = useSimulationStore((state) => state.alignmentSide);
   const offensivePlayId = useSimulationStore((state) => state.offensivePlayId);
-  const teamPlay = useSimulationStore((state) => state.sim?.config.teamPlay ?? null);
   const setLineupPlayer = useSimulationStore((state) => state.setLineupPlayer);
   const setRouteId = useSimulationStore((state) => state.setRouteId);
   const setDefensivePlayId = useSimulationStore((state) => state.setDefensivePlayId);
@@ -118,6 +118,7 @@ export const SetupPanel = () => {
   const setAlignmentSide = useSimulationStore((state) => state.setAlignmentSide);
   const setOffensivePlayId = useSimulationStore((state) => state.setOffensivePlayId);
   const activePlay = OFFENSIVE_PLAYS.find((play) => play.id === offensivePlayId) ?? null;
+  const [isRosterVisible, setIsRosterVisible] = useState(true);
 
   const selectedRoute = routes.find((route) => route.id === routeId);
   const routeHasCut = selectedRoute?.waypoints.some((waypoint) => waypoint.cut) ?? false;
@@ -135,24 +136,30 @@ export const SetupPanel = () => {
   const handleRouteClick = (id: string) => (): void => setRouteId(id);
   const handleCategoryClick = (option: PlayCategory) => (): void => setCategory(option);
   const handleClearPlay = (): void => setOffensivePlayId(null);
+  const handleToggleRoster = (): void => setIsRosterVisible((visible) => !visible);
+
+  const teamRoutes: Partial<Record<SkillPosition, string>> | undefined = activePlay
+    ? Object.fromEntries(activePlay.assignments.map((assignment) => [assignment.position, assignment.routeName]))
+    : undefined;
 
   const teamSection = activePlay ? (
     <section key="team" aria-label="5-on-5 play" className="flex flex-col gap-3">
       <div className="rounded-lg border border-border bg-card p-3">
         <p className="font-display text-sm font-semibold uppercase tracking-wide text-foreground">{activePlay.name}</p>
         <p className="mt-1 text-sm text-muted-foreground">
-          {getFormation(activePlay.formationId).name}. The quarterback reads at 2.2 seconds. Your cornerback covers X; the other defensive backs fill the rest.
+          {getFormation(activePlay.formationId).name}. The quarterback reads at 2.2 seconds. Click a player on the field to change that spot. The same lineup runs every 5-on-5 play.
         </p>
-        {teamPlay ? (
-          <ul className="mt-2 flex flex-col gap-1" aria-label="Assignments">
-            {teamPlay.runners.map((runner) => (
-              <li key={runner.id} className="text-xs text-muted-foreground">
-                <span className="font-semibold text-foreground">{runner.id}</span> #{runner.player.jerseyNumber} {runner.player.name} · {runner.routeName}
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
+      <button
+        type="button"
+        aria-expanded={isRosterVisible}
+        aria-controls="setup-roster"
+        onClick={handleToggleRoster}
+        className="h-9 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-foreground transition-colors duration-150 hover:bg-accent pointer-coarse:h-11"
+      >
+        {isRosterVisible ? "Hide roster" : "Show roster"}
+      </button>
+      {isRosterVisible && <TeamLineupForm idPrefix="setup" routes={teamRoutes} />}
       <button
         type="button"
         onClick={handleClearPlay}
@@ -288,25 +295,27 @@ export const SetupPanel = () => {
         </section>
       )}
 
-      <details className="group rounded-lg border border-border bg-card">
-        <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-medium text-foreground">
-          Quarterback, defender &amp; rusher
-          <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
-        </summary>
-        <div className="flex flex-col gap-3 border-t border-border p-3">
-          {DEFENSE_SELECTS.map((config) => (
-            <LabeledSelect
-              key={config.id}
-              id={config.id}
-              label={config.label}
-              value={lineup[config.role]}
-              options={buildPlayerOptions(players, config.position)}
-              onChange={(value) => setLineupPlayer(config.role, value)}
-              placeholder="Default player"
-            />
-          ))}
-        </div>
-      </details>
+      {!activePlay && (
+        <details className="group rounded-lg border border-border bg-card">
+          <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-sm font-medium text-foreground">
+            Quarterback, defender &amp; rusher
+            <ChevronDown className="size-4 text-muted-foreground transition-transform duration-200 group-open:rotate-180" aria-hidden="true" />
+          </summary>
+          <div className="flex flex-col gap-3 border-t border-border p-3">
+            {DEFENSE_SELECTS.map((config) => (
+              <LabeledSelect
+                key={config.id}
+                id={config.id}
+                label={config.label}
+                value={lineup[config.role]}
+                options={buildPlayerOptions(players, config.position)}
+                onChange={(value) => setLineupPlayer(config.role, value)}
+                placeholder="Default player"
+              />
+            ))}
+          </div>
+        </details>
+      )}
     </div>
   );
 };
