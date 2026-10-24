@@ -20,6 +20,19 @@ npm run dev                 # http://localhost:3000
 
 Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`.
 
+## Production
+
+Docker-based: Postgres 16, a one-shot `prisma migrate deploy` job, and the Next.js standalone server, all in `docker-compose.prod.yml` (separate project `flag-football-prod`, so it never touches the dev database).
+
+```bash
+cp .env.production.example .env.production   # set a strong POSTGRES_PASSWORD
+npm run prod:up                              # build, migrate, start on APP_PORT (default 3000)
+npm run prod:logs
+npm run prod:down                            # stop; data stays in the flag_football_pgdata_prod volume
+```
+
+The seed is not run in production because it replaces the roster. To load the sample data once, run `npm run db:seed` with `DATABASE_URL` pointing at the production database.
+
 ## Project structure
 
 The code is organized by bounded context, following DDD. See [docs/ddd](docs/ddd) for scope, discovery and architecture notes.

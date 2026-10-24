@@ -15,6 +15,9 @@
     "db:generate": "prisma generate",
     "db:seed": "prisma db seed",
     "db:setup": "docker compose up -d && prisma migrate deploy && prisma generate && prisma db seed",
+    "prod:up": "docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build",
+    "prod:down": "docker compose -f docker-compose.prod.yml --env-file .env.production down",
+    "prod:logs": "docker compose -f docker-compose.prod.yml --env-file .env.production logs -f app",
     "postinstall": "prisma generate"
   },
   "dependencies": {
