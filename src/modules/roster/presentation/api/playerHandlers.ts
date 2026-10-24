@@ -1,4 +1,5 @@
 import { NextResponse, connection } from "next/server";
+import { assertActivationKeyHeader } from "@/shared/infrastructure/auth/activationKey";
 import { handleApiError } from "@/shared/infrastructure/http/apiResponses";
 import type { PlayerUseCases } from "../../application/playerUseCases";
 import { playerInputSchema } from "../../domain/playerSchema";
@@ -18,6 +19,7 @@ export const createPlayerHandlers = (useCases: PlayerUseCases) => ({
 
   create: async (request: Request) => {
     try {
+      assertActivationKeyHeader(request);
       const input = playerInputSchema.parse(await request.json());
       return NextResponse.json(await useCases.registerPlayer(input), { status: 201 });
     } catch (error) {
@@ -37,6 +39,7 @@ export const createPlayerHandlers = (useCases: PlayerUseCases) => ({
 
   update: async (request: Request, context: PlayerRouteContext) => {
     try {
+      assertActivationKeyHeader(request);
       const { id } = await context.params;
       const input = playerInputSchema.parse(await request.json());
       return NextResponse.json(await useCases.updatePlayer(id, input));
@@ -45,8 +48,9 @@ export const createPlayerHandlers = (useCases: PlayerUseCases) => ({
     }
   },
 
-  remove: async (_request: Request, context: PlayerRouteContext) => {
+  remove: async (request: Request, context: PlayerRouteContext) => {
     try {
+      assertActivationKeyHeader(request);
       const { id } = await context.params;
       await useCases.removePlayer(id);
       return new NextResponse(null, { status: 204 });

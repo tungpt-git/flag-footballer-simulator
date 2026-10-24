@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "@/shared/ui/ThemeToggle";
+import { ActivationKeyButton } from "@/shared/ui/layout/ActivationKeyButton";
 
 const LogoMark = () => (
   <svg viewBox="84 207 1531 492" className="h-7 w-auto fill-primary" aria-hidden="true">
@@ -36,13 +37,7 @@ export const AppHeader = ({ modeSwitcher }: AppHeaderProps) => (
     <div className="flex items-center gap-2">
       {modeSwitcher}
       <ThemeToggle />
-      <div
-        className="hidden size-8 items-center justify-center rounded-full bg-secondary text-xs font-semibold text-foreground sm:flex"
-        role="img"
-        aria-label="Signed in as Coach"
-      >
-        C
-      </div>
+      <ActivationKeyButton />
     </div>
   </header>
 );

@@ -20,6 +20,7 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env.production}
+      ACTIVATION_KEY: ${ACTIVATION_KEY:-}
     ports:
       - "${APP_PORT:-3000}:3000"
     depends_on:

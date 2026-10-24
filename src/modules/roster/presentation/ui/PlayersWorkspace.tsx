@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AlertCircle, LayoutGrid, List, Plus, RotateCw, Search, SearchX, Users } from "lucide-react";
+import { getActivationKey, openActivationDialog } from "@/shared/ui/activation/activationSession";
 import { PageHeading } from "@/shared/ui/layout/PageHeading";
 import { Button } from "@/shared/ui/primitives/button";
 import { Input } from "@/shared/ui/primitives/input";
@@ -95,16 +96,24 @@ export const PlayersWorkspace = () => {
   const countFor = (positionFilter: PositionFilter): number =>
     positionFilter === "ALL" ? players.length : players.filter((player) => canPlayPosition(player, positionFilter)).length;
 
+  const requireActivationKey = (): boolean => {
+    if (getActivationKey()) return true;
+    openActivationDialog();
+    return false;
+  };
   const handleCreate = (): void => {
+    if (!requireActivationKey()) return;
     setEditingPlayer(null);
     setIsFormOpen(true);
   };
   const handleEdit = (player: PlayerProfile): void => {
+    if (!requireActivationKey()) return;
     setViewingPlayer(null);
     setEditingPlayer(player);
     setIsFormOpen(true);
   };
   const handleRequestDelete = (player: PlayerProfile): void => {
+    if (!requireActivationKey()) return;
     setViewingPlayer(null);
     setPlayerToDelete(player);
   };
