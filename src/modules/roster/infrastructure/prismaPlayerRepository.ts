@@ -45,13 +45,19 @@ const toPlayerData = (input: PlayerInput) => ({
 
 /** Translates Prisma error codes into the roster's domain errors. */
 const translateError = (error: unknown): never => {
-  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") throw new PlayerNotFoundError();
+  if (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === "P2025"
+  )
+    throw new PlayerNotFoundError();
   throw error;
 };
 
 export const prismaPlayerRepository: PlayerRepository = {
   findAll: async () => {
-    const players = await prisma.player.findMany({ orderBy: [{ position: "asc" }, { jerseyNumber: "asc" }] });
+    const players = await prisma.player.findMany({
+      orderBy: [{ position: "asc" }, { jerseyNumber: "asc" }],
+    });
     return players.map(toPlayerProfile);
   },
 
@@ -62,7 +68,9 @@ export const prismaPlayerRepository: PlayerRepository = {
 
   create: async (input) => {
     try {
-      return toPlayerProfile(await prisma.player.create({ data: toPlayerData(input) }));
+      return toPlayerProfile(
+        await prisma.player.create({ data: toPlayerData(input) }),
+      );
     } catch (error) {
       return translateError(error);
     }
@@ -70,7 +78,12 @@ export const prismaPlayerRepository: PlayerRepository = {
 
   update: async (id, input) => {
     try {
-      return toPlayerProfile(await prisma.player.update({ where: { id }, data: toPlayerData(input) }));
+      return toPlayerProfile(
+        await prisma.player.update({
+          where: { id },
+          data: toPlayerData(input),
+        }),
+      );
     } catch (error) {
       return translateError(error);
     }

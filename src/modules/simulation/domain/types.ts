@@ -1,5 +1,5 @@
 import type { Vec2 } from "@/shared/kernel/geometry";
-import type { DecisionTrigger, Route } from "@/modules/playbook";
+import type { DecisionTrigger, Route, SkillPosition } from "@/modules/playbook";
 import type { PlayerProfile } from "@/modules/roster";
 import type { DefensivePlayId } from "./defensivePlays";
 
@@ -75,9 +75,42 @@ export type PlayOutcome = {
   metrics?: PassMetrics;
 };
 
+/** One button on a 5-on-5 pause: a throw to a skill player, or a scramble. */
+export type OffenseChoice = {
+  id: string;
+  label: string;
+  description: string;
+  /** Receiver to throw to. Null means scramble. */
+  targetId: string | null;
+};
+
 export type PendingDecision =
-  | { dpId: string; category: "OFFENSE"; options: DecisionAction[] }
+  | { dpId: string; category: "OFFENSE"; options: DecisionAction[]; choices?: OffenseChoice[] }
   | { dpId: string; category: "DEFENSE"; options: DefensiveAction[] };
+
+/** One skill player on a 5-on-5 call, already placed on the field. */
+export type TeamRunnerSetup = {
+  id: SkillPosition;
+  routeName: string;
+  /** Absolute field points. The first point is the alignment. */
+  points: Vec2[];
+  player: PlayerProfile;
+};
+
+/** The defender lined up over one skill player. */
+export type TeamDefenderSetup = {
+  runnerId: SkillPosition;
+  player: PlayerProfile;
+};
+
+/** A full 5-on-5 call: four routes plus the quarterback's spot. The rusher stays on the lineup. */
+export type TeamPlaySetup = {
+  playId: string;
+  playName: string;
+  quarterbackPos: Vec2;
+  runners: TeamRunnerSetup[];
+  defenders: TeamDefenderSetup[];
+};
 
 export type BallState = {
   from: Vec2;
@@ -123,7 +156,9 @@ export type SimulationConfig = SimulationLineup & {
   decisionTrigger: DecisionTrigger;
   /** Line of scrimmage, in field yards. */
   losY: number;
-  /** Receiver's starting x position. */
+  /** Receiver's starting x position. Ignored when `teamPlay` is set. */
   alignmentX: number;
   seed: number;
+  /** When set, the snap is a 5-on-5 call instead of one receiver. */
+  teamPlay?: TeamPlaySetup;
 };

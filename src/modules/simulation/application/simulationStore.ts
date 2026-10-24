@@ -8,7 +8,7 @@ import type {
   SimulationMode,
   FieldViewMode,
 } from "../domain/types";
-import type { DecisionTrigger, Route } from "@/modules/playbook";
+import { OFFENSIVE_PLAYS, type DecisionTrigger, type Route } from "@/modules/playbook";
 import { canPlayPosition, type PlayerProfile } from "@/modules/roster";
 import { DEFAULT_DEFENSIVE_PLAY_ID, getDefensivePlay, type DefensivePlayId } from "../domain/defensivePlays";
 import { DEFAULT_CORNERBACK, DEFAULT_QUARTERBACK, DEFAULT_RUSHER } from "../domain/constants";
@@ -19,11 +19,14 @@ import {
   SimulationState,
   applyDecision,
   applyDefensiveDecision,
+  applyOffenseChoice,
   computeFrameMetrics,
   createSimulation,
   previewDecision,
+  previewReceiverThrow,
   stepSimulation,
 } from "../domain/simulation";
+import { buildTeamSimulationConfig } from "../domain/teamPlay";
 import { CALL_LABELS, OUTCOME_LABELS, OUTCOME_TONES } from "../domain/labels";
 import type { Tone } from "@/shared/kernel/tone";
 
@@ -51,7 +54,7 @@ export type LiveSnapshot = {
   metrics: FrameMetrics;
 };
 
-export type DecisionPreviews = Partial<Record<DecisionAction, PassPreview>>;
+export type DecisionPreviews = Partial<Record<string, PassPreview>>;
 
 type SimulationStore = {
   mode: SimulationMode;
@@ -60,6 +63,8 @@ type SimulationStore = {
   routes: Route[];
   lineup: Lineup;
   routeId: string | null;
+  /** Set while the simulator is running a 5-on-5 call. Cleared when a single route is chosen. */
+  offensivePlayId: string | null;
   defensivePlayId: DefensivePlayId;
   trigger: DecisionTrigger;
   alignmentSide: AlignmentSide;
@@ -77,6 +82,7 @@ type SimulationStore = {
   setCategory: (category: PlayCategory) => void;
   setLineupPlayer: (role: LineupRole, playerId: string | null) => void;
   setRouteId: (routeId: string) => void;
+  setOffensivePlayId: (offensivePlayId: string | null) => void;
   setDefensivePlayId: (defensivePlayId: DefensivePlayId) => void;
   setTrigger: (trigger: DecisionTrigger) => void;
   setAlignmentSide: (side: AlignmentSide) => void;
@@ -87,6 +93,7 @@ type SimulationStore = {
   reset: () => void;
   tick: (deltaSec: number) => void;
   submitDecision: (action: DecisionAction) => void;
+  submitOffenseChoice: (choiceId: string) => void;
   submitDefensiveDecision: (action: DefensiveAction) => void;
   clearLog: () => void;
 };
@@ -102,9 +109,27 @@ export const getAlignmentX = (side: AlignmentSide): number =>
 
 /** Builds a simulation config from the current selections, or null if no receiver/route is chosen. */
 export const buildSimulationConfig = (
-  store: Pick<SimulationStore, "mode" | "category" | "players" | "routes" | "lineup" | "routeId" | "defensivePlayId" | "trigger" | "alignmentSide">,
+  store: Pick<
+    SimulationStore,
+    "mode" | "category" | "players" | "routes" | "lineup" | "routeId" | "offensivePlayId" | "defensivePlayId" | "trigger" | "alignmentSide"
+  >,
   seed: number,
 ): SimulationConfig | null => {
+  const play = OFFENSIVE_PLAYS.find((candidate) => candidate.id === store.offensivePlayId);
+  if (play) {
+    return buildTeamSimulationConfig({
+      play,
+      players: store.players,
+      mode: store.mode,
+      category: store.category,
+      defensivePlayId: store.defensivePlayId,
+      quarterback: findPlayer(store.players, store.lineup.quarterbackId) ?? DEFAULT_QUARTERBACK,
+      cornerback: findPlayer(store.players, store.lineup.cornerbackId) ?? DEFAULT_CORNERBACK,
+      rusher: findPlayer(store.players, store.lineup.rusherId) ?? DEFAULT_RUSHER,
+      seed,
+    });
+  }
+
   const receiver = findPlayer(store.players, store.lineup.receiverId);
   const route = store.routes.find((candidate) => candidate.id === store.routeId);
   if (!receiver || !route) return null;
@@ -162,6 +187,7 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     routes: [],
     lineup: { receiverId: null, quarterbackId: null, cornerbackId: null, rusherId: null },
     routeId: null,
+    offensivePlayId: null,
     defensivePlayId: DEFAULT_DEFENSIVE_PLAY_ID,
     trigger: "AT_CUT",
     alignmentSide: "LEFT",
@@ -195,7 +221,8 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     setMode: (mode) => rebuild({ mode }),
     setCategory: (category) => rebuild({ category }),
     setLineupPlayer: (role, playerId) => rebuild({ lineup: { ...get().lineup, [role]: playerId } }),
-    setRouteId: (routeId) => rebuild({ routeId }),
+    setRouteId: (routeId) => rebuild({ routeId, offensivePlayId: null }),
+    setOffensivePlayId: (offensivePlayId) => rebuild({ offensivePlayId }),
     setDefensivePlayId: (defensivePlayId) => rebuild({ defensivePlayId }),
     setTrigger: (trigger) => rebuild({ trigger }),
     setAlignmentSide: (alignmentSide) => rebuild({ alignmentSide }),
@@ -213,11 +240,12 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       if (!sim) return;
 
       if (sim.phase === "PRE_SNAP") {
-        const { receiver, route, category } = sim.config;
+        const { receiver, route, category, teamPlay } = sim.config;
         const modeLabel = sim.config.mode === "TACTICAL" ? "Tactical" : "Playbook";
         const defenseName = getDefensivePlay(sim.config.defensivePlayId).name;
-        const snapMessage =
-          category === "DEFENSE"
+        const snapMessage = teamPlay
+          ? `${modeLabel} snap: ${teamPlay.playName} against ${defenseName}.`
+          : category === "DEFENSE"
             ? `${modeLabel} snap: you call ${defenseName} against #${receiver.jerseyNumber} ${receiver.name}'s ${route.name}.`
             : `${modeLabel} snap: #${receiver.jerseyNumber} ${receiver.name} runs a ${route.name} against ${defenseName}.`;
         eventLog = appendLog(eventLog, 0, "neutral", snapMessage);
@@ -246,11 +274,25 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       }
 
       const snapshot = { t: next.t, metrics: computeFrameMetrics(next) };
-      const enginePlayLog = next.offenseAction && !sim.offenseAction ? appendLog(eventLog, next.t, "info", describeEngineOffense(next.offenseAction)) : eventLog;
+      const thrownTo = next.config.teamPlay?.runners.find((runner) => runner.id === next.offenseTargetId);
+      const engineMessage = thrownTo
+        ? `The QB throws to ${thrownTo.id} on the ${thrownTo.routeName}.`
+        : next.offenseAction
+          ? describeEngineOffense(next.offenseAction)
+          : null;
+      const enginePlayLog =
+        next.offenseAction && !sim.offenseAction && engineMessage ? appendLog(eventLog, next.t, "info", engineMessage) : eventLog;
 
       if (next.phase === "PAUSED_FOR_DECISION") {
         const decisionPreviews: DecisionPreviews = {};
-        if (next.config.category === "OFFENSE") {
+        const choices = next.pendingDecision?.category === "OFFENSE" ? next.pendingDecision.choices : undefined;
+        if (choices) {
+          choices.forEach((choice) => {
+            if (!choice.targetId) return;
+            const preview = previewReceiverThrow(next, choice.targetId);
+            if (preview) decisionPreviews[choice.id] = preview;
+          });
+        } else if (next.config.category === "OFFENSE") {
           (["PASS_TO_WR", "CHECKDOWN"] as const).forEach((action) => {
             const preview = previewDecision(next, action);
             if (preview) decisionPreviews[action] = preview;
@@ -295,6 +337,20 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         isPlaying: true,
         decisionPreviews: {},
         eventLog: appendLog(eventLog, sim.t, "neutral", `Decision: ${CALL_LABELS[action]}.`),
+      });
+    },
+
+    submitOffenseChoice: (choiceId) => {
+      const { sim, eventLog } = get();
+      if (!sim || sim.phase !== "PAUSED_FOR_DECISION" || sim.pendingDecision?.category !== "OFFENSE") return;
+      const choice = sim.pendingDecision.choices?.find((candidate) => candidate.id === choiceId);
+      if (!choice) return;
+
+      set({
+        sim: applyOffenseChoice(sim, choiceId),
+        isPlaying: true,
+        decisionPreviews: {},
+        eventLog: appendLog(eventLog, sim.t, "neutral", `Decision: ${choice.label}.`),
       });
     },
 

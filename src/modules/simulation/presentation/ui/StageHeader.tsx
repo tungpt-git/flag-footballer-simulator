@@ -58,7 +58,9 @@ export const StageHeader = () => {
           </h1>
           <p className="truncate text-xs text-muted-foreground">
             {config
-              ? `#${config.receiver.jerseyNumber} ${config.receiver.name} · ${config.route.name} · vs ${getDefensivePlay(config.defensivePlayId).name}`
+              ? config.teamPlay
+                ? `${config.teamPlay.playName} · vs ${getDefensivePlay(config.defensivePlayId).name}`
+                : `#${config.receiver.jerseyNumber} ${config.receiver.name} · ${config.route.name} · vs ${getDefensivePlay(config.defensivePlayId).name}`
               : "Choose a receiver and a route"}
           </p>
         </div>

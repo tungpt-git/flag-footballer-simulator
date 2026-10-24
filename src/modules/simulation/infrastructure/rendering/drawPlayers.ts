@@ -269,7 +269,9 @@ export const drawDecisionSpotlight = (
   if (state.phase !== "PAUSED_FOR_DECISION") return;
   const pulse = options.reducedMotion ? 0.5 : 0.5 + 0.5 * Math.sin(timeMs / 260);
   const radius = getDotRadiusPx(transform) + SPOTLIGHT_PADDING_PX;
-  const spotlit = state.entities.filter((entity) => SPOTLIGHT_IDS.includes(entity.id));
+  const spotlit = state.config.teamPlay
+    ? state.entities
+    : state.entities.filter((entity) => SPOTLIGHT_IDS.includes(entity.id));
 
   ctx.save();
   ctx.fillStyle = CANVAS_COLORS.dim;
@@ -285,7 +287,9 @@ export const drawDecisionSpotlight = (
 
   // Pulsing ring on the two throwing targets.
   state.entities
-    .filter((entity) => entity.id === ENTITY_IDS.receiver || entity.id === ENTITY_IDS.outlet)
+    .filter((entity) =>
+      state.config.teamPlay ? entity.role === "RECEIVER" : entity.id === ENTITY_IDS.receiver || entity.id === ENTITY_IDS.outlet,
+    )
     .forEach((entity) => {
       const center = transform.toCanvas(entity.pos);
       ctx.save();

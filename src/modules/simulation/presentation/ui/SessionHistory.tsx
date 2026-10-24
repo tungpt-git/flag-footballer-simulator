@@ -261,7 +261,7 @@ export const SessionHistory = () => {
                         </p>
                         <p className="text-sm text-muted-foreground">
                           {entry.receiverLabel} · {entry.routeName} · vs {entry.defenseName}
-                          {entry.decision && ` · Called: ${CALL_LABELS[entry.decision]}`}
+                          {entry.decision && ` · Called: ${entry.decision in CALL_LABELS ? CALL_LABELS[entry.decision as keyof typeof CALL_LABELS] : entry.decision}`}
                         </p>
                         <p className="mt-0.5 text-sm text-foreground">{entry.reason}</p>
                       </div>

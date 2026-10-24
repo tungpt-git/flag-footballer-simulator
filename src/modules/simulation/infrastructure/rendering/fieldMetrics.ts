@@ -34,9 +34,13 @@ export type FieldTransform = {
 };
 
 /** Visible vertical range, in field yards. */
-export const getFieldViewport = (viewMode: FieldViewMode, losY: number): FieldViewport => {
+export const getFieldViewport = (
+  viewMode: FieldViewMode,
+  losY: number,
+  behindLosYd: number = PLAY_VIEW_BEHIND_LOS_YD,
+): FieldViewport => {
   if (viewMode === "FULL") return { yMin: 0, yMax: FIELD_TOTAL_YD };
-  const span = PLAY_VIEW_BEHIND_LOS_YD + PLAY_VIEW_AHEAD_LOS_YD;
+  const span = behindLosYd + PLAY_VIEW_AHEAD_LOS_YD;
   const yMax = Math.min(FIELD_TOTAL_YD, losY + PLAY_VIEW_AHEAD_LOS_YD);
   return { yMin: Math.max(0, yMax - span), yMax };
 };

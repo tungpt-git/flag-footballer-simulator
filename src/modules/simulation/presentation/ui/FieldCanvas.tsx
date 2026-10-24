@@ -6,7 +6,8 @@ import { Button } from "@/shared/ui/primitives/button";
 import { usePrefersReducedMotion } from "@/shared/ui/hooks/usePrefersReducedMotion";
 import { cn } from "@/shared/ui/utils";
 import { DEFAULT_LOS_Y } from "@/shared/kernel/field";
-import { getOutletRoutePoints, getReceiverRoutePoints, type SimulationState } from "../../domain/simulation";
+import { PLAY_VIEW_BEHIND_LOS_YD } from "../../domain/constants";
+import { getOutletRoutePoints, getReceiverRoutePoints, getRenderableRoutes, type SimulationState } from "../../domain/simulation";
 import { CANVAS_COLORS } from "../../infrastructure/rendering/colors";
 import { drawField } from "../../infrastructure/rendering/drawField";
 import {
@@ -40,7 +41,26 @@ const DRAG_THRESHOLD_PX = 4;
 
 type Size = { width: number; height: number };
 
+const TEAM_ROUTE_COLOR: Record<string, string> = {
+  X: CANVAS_COLORS.routeX,
+  Y: CANVAS_COLORS.routeY,
+  Z: CANVAS_COLORS.routeZ,
+  C: CANVAS_COLORS.routeC,
+};
+
 const drawRoutes = (ctx: CanvasRenderingContext2D, transform: FieldTransform, sim: SimulationState): void => {
+  const teamRoutes = getRenderableRoutes(sim);
+  if (teamRoutes.length > 0) {
+    teamRoutes.forEach((route) => {
+      drawRoute(ctx, transform, route.points, {
+        color: TEAM_ROUTE_COLOR[route.id] ?? CANVAS_COLORS.routeActive,
+        lineWidth: 2.5,
+        progress: route.progress,
+      });
+    });
+    return;
+  }
+
   const outletPoints = getOutletRoutePoints(sim);
   if (outletPoints) {
     drawRoute(ctx, transform, outletPoints, { color: CANVAS_COLORS.routeOutlet, lineWidth: 2 });
@@ -65,6 +85,14 @@ const drawRoutes = (ctx: CanvasRenderingContext2D, transform: FieldTransform, si
 
 const buildAriaLabel = (sim: SimulationState | null): string => {
   if (!sim) return "Flag football field. Select a receiver and a route to begin.";
+  if (sim.config.teamPlay) {
+    const calls = sim.config.teamPlay.runners.map((runner) => `${runner.id} ${runner.routeName}`).join(", ");
+    const base = `Top-down flag football field: ${sim.config.teamPlay.playName}. ${calls}.`;
+    if (sim.phase === "PAUSED_FOR_DECISION") return `${base} Play paused, waiting for your decision.`;
+    if (sim.phase === "FINISHED" && sim.outcome) return `${base} Result: ${OUTCOME_LABELS[sim.outcome.result]}.`;
+    if (sim.phase === "FINISHED") return `${base} Play complete.`;
+    return base;
+  }
   const { receiver, route } = sim.config;
   const base = `Top-down flag football field: receiver number ${receiver.jerseyNumber} running a ${route.name} route.`;
   if (sim.phase === "PAUSED_FOR_DECISION") return `${base} Play paused, waiting for your decision.`;
@@ -91,14 +119,21 @@ export const FieldCanvas = () => {
 
   const viewMode = useSimulationStore((state) => state.viewMode);
   const losY = useSimulationStore((state) => state.sim?.config.losY ?? DEFAULT_LOS_Y);
+  const behindLosYd = useSimulationStore((state) => {
+    const runners = state.sim?.config.teamPlay?.runners;
+    const line = state.sim?.config.losY ?? DEFAULT_LOS_Y;
+    if (!runners?.length) return PLAY_VIEW_BEHIND_LOS_YD;
+    const deepestBack = Math.min(...runners.map((runner) => runner.points[0].y));
+    return Math.max(PLAY_VIEW_BEHIND_LOS_YD, line - deepestBack + 2);
+  });
   const ariaLabel = useSimulationStore((state) => buildAriaLabel(state.sim));
 
   const applyView = useCallback(
     (nextView: FieldView): void => {
-      viewRef.current = clampFieldView(nextView, getFieldViewport(viewMode, losY));
+      viewRef.current = clampFieldView(nextView, getFieldViewport(viewMode, losY, behindLosYd));
       setZoom(viewRef.current.zoom);
     },
-    [viewMode, losY],
+    [viewMode, losY, behindLosYd],
   );
 
   useEffect(() => {
@@ -136,7 +171,7 @@ export const FieldCanvas = () => {
 
     const devicePixelRatio = window.devicePixelRatio || 1;
     const { width: widthPx, height: heightPx } = size;
-    const viewport = getFieldViewport(viewMode, losY);
+    const viewport = getFieldViewport(viewMode, losY, behindLosYd);
 
     canvas.width = Math.round(widthPx * devicePixelRatio);
     canvas.height = Math.round(heightPx * devicePixelRatio);
@@ -196,7 +231,7 @@ export const FieldCanvas = () => {
 
     animationFrameId = requestAnimationFrame(renderFrame);
     return () => cancelAnimationFrame(animationFrameId);
-  }, [size, viewMode, losY, isReducedMotion]);
+  }, [size, viewMode, losY, behindLosYd, isReducedMotion]);
 
   const getPointerPoint = (event: React.PointerEvent<HTMLCanvasElement>): { x: number; y: number } => {
     const rect = event.currentTarget.getBoundingClientRect();

@@ -17,3 +17,5 @@ export {
   getInsideDirection,
   resolveRoutePoints,
 } from "./domain/routeTemplates";
+export type { Formation, FormationId, OffensivePlay, PlayAssignment, SkillPosition } from "./domain/offensivePlays";
+export { FORMATIONS, OFFENSIVE_PLAYS, getFormation, getPlayDepthYd } from "./domain/offensivePlays";

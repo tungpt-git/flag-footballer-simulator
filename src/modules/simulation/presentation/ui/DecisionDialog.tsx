@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Shuffle, Target } from "lucide-react";
 import { Button } from "@/shared/ui/primitives/button";
 import { formatPercent } from "@/shared/ui/format";
 import { cn } from "@/shared/ui/utils";
@@ -57,6 +58,7 @@ export const DecisionDialog = () => {
   const previews = useSimulationStore((state) => state.decisionPreviews);
   const rusherDistance = useSimulationStore((state) => state.snapshot?.metrics.rusherDistanceYd ?? null);
   const submitDecision = useSimulationStore((state) => state.submitDecision);
+  const submitOffenseChoice = useSimulationStore((state) => state.submitOffenseChoice);
   const submitDefensiveDecision = useSimulationStore((state) => state.submitDefensiveDecision);
   const recordDecision = useSessionHistoryStore((state) => state.recordDecision);
   const firstOptionRef = useRef<HTMLButtonElement>(null);
@@ -67,6 +69,14 @@ export const DecisionDialog = () => {
 
     const handleKeyDown = (event: KeyboardEvent): void => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const choices = pendingDecision.category === "OFFENSE" ? pendingDecision.choices : undefined;
+      if (choices) {
+        const choice = choices[Number(event.key) - 1];
+        if (!choice) return;
+        recordDecision(choice.label);
+        submitOffenseChoice(choice.id);
+        return;
+      }
       const action = findCallByShortcut<PlayCall>(pendingDecision.options, event.key);
       if (!action) return;
       recordDecision(action);
@@ -75,12 +85,18 @@ export const DecisionDialog = () => {
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [pendingDecision, submitDecision, submitDefensiveDecision, recordDecision]);
+  }, [pendingDecision, submitDecision, submitOffenseChoice, submitDefensiveDecision, recordDecision]);
 
   if (!pendingDecision) return null;
 
   const isDefense = pendingDecision.category === "DEFENSE";
+  const choices = pendingDecision.category === "OFFENSE" ? pendingDecision.choices : undefined;
   const options: PlayCall[] = pendingDecision.options;
+
+  const handleChooseChoice = (choiceId: string, label: string) => (): void => {
+    recordDecision(label);
+    submitOffenseChoice(choiceId);
+  };
 
   const handleChoose = (action: PlayCall) => (): void => {
     recordDecision(action);
@@ -120,6 +136,44 @@ export const DecisionDialog = () => {
           </p>
         </div>
 
+        {choices ? (
+          <ul className="grid grid-cols-2 gap-1.5 p-2 sm:grid-cols-3 md:grid-cols-5 md:gap-2">
+            {choices.map((choice, index) => {
+              const Icon = choice.targetId ? Target : Shuffle;
+              const preview = choice.targetId ? previews[choice.id] : undefined;
+              return (
+                <li key={choice.id} className="flex">
+                  <Button
+                    ref={index === 0 ? firstOptionRef : undefined}
+                    variant="outline"
+                    onClick={handleChooseChoice(choice.id, choice.label)}
+                    aria-keyshortcuts={String(index + 1)}
+                    className="h-auto min-h-16 w-full flex-col items-stretch justify-start gap-1.5 whitespace-normal rounded-xl p-2 text-left hover:border-mode-live hover:bg-accent md:p-2.5"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-mode-live/15 text-mode-live">
+                        <Icon className="size-4.5" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1 font-display text-sm leading-tight font-semibold uppercase tracking-wide">{choice.label}</span>
+                      <kbd className="hidden size-6 shrink-0 items-center justify-center rounded-md border border-border bg-muted font-mono text-xs font-semibold text-foreground md:flex">
+                        {index + 1}
+                      </kbd>
+                    </span>
+                    <span className="text-xs font-normal text-muted-foreground">{choice.description}</span>
+                    {preview ? (
+                      <span className="hidden flex-wrap gap-1 md:flex">
+                        <OddsChip label="Complete" value={preview.probabilities.complete} className="bg-success-soft text-success" />
+                        <OddsChip label="INT" value={preview.probabilities.intercept} className="bg-danger-soft text-danger" />
+                      </span>
+                    ) : null}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+
+        {choices ? null : (
         <ul className="grid grid-cols-3 gap-1.5 p-2 md:gap-2">
           {options.map((action, index) => {
             const { icon: Icon, shortcut, risk, reward } = CALL_PRESENTATION[action];
@@ -159,6 +213,7 @@ export const DecisionDialog = () => {
             );
           })}
         </ul>
+        )}
       </div>
     </div>
   );

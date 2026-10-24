@@ -6,7 +6,7 @@ import { LabeledSelect, type SelectOption } from "@/shared/ui/primitives/labeled
 import { DEFAULT_LOS_Y } from "@/shared/kernel/field";
 import { createRunnerRuntime, estimateRouteDurationSec } from "../../domain/movement";
 import { canPlayPosition, dashToMetersPerSecond, type PlayerProfile, type Position } from "@/modules/roster";
-import { resolveRoutePoints } from "@/modules/playbook";
+import { OFFENSIVE_PLAYS, getFormation, resolveRoutePoints } from "@/modules/playbook";
 import { RouteThumbnail } from "@/modules/playbook/ui";
 import { DEFENSIVE_PLAYS, getDefensivePlay, type DefensivePlayId } from "../../domain/defensivePlays";
 import { CATEGORY_LABELS, TRIGGER_LABELS } from "../../domain/labels";
@@ -109,11 +109,15 @@ export const SetupPanel = () => {
   const defensivePlayId = useSimulationStore((state) => state.defensivePlayId);
   const trigger = useSimulationStore((state) => state.trigger);
   const alignmentSide = useSimulationStore((state) => state.alignmentSide);
+  const offensivePlayId = useSimulationStore((state) => state.offensivePlayId);
+  const teamPlay = useSimulationStore((state) => state.sim?.config.teamPlay ?? null);
   const setLineupPlayer = useSimulationStore((state) => state.setLineupPlayer);
   const setRouteId = useSimulationStore((state) => state.setRouteId);
   const setDefensivePlayId = useSimulationStore((state) => state.setDefensivePlayId);
   const setTrigger = useSimulationStore((state) => state.setTrigger);
   const setAlignmentSide = useSimulationStore((state) => state.setAlignmentSide);
+  const setOffensivePlayId = useSimulationStore((state) => state.setOffensivePlayId);
+  const activePlay = OFFENSIVE_PLAYS.find((play) => play.id === offensivePlayId) ?? null;
 
   const selectedRoute = routes.find((route) => route.id === routeId);
   const routeHasCut = selectedRoute?.waypoints.some((waypoint) => waypoint.cut) ?? false;
@@ -130,6 +134,34 @@ export const SetupPanel = () => {
   };
   const handleRouteClick = (id: string) => (): void => setRouteId(id);
   const handleCategoryClick = (option: PlayCategory) => (): void => setCategory(option);
+  const handleClearPlay = (): void => setOffensivePlayId(null);
+
+  const teamSection = activePlay ? (
+    <section key="team" aria-label="5-on-5 play" className="flex flex-col gap-3">
+      <div className="rounded-lg border border-border bg-card p-3">
+        <p className="font-display text-sm font-semibold uppercase tracking-wide text-foreground">{activePlay.name}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {getFormation(activePlay.formationId).name}. The quarterback reads at 2.2 seconds. Your cornerback covers X; the other defensive backs fill the rest.
+        </p>
+        {teamPlay ? (
+          <ul className="mt-2 flex flex-col gap-1" aria-label="Assignments">
+            {teamPlay.runners.map((runner) => (
+              <li key={runner.id} className="text-xs text-muted-foreground">
+                <span className="font-semibold text-foreground">{runner.id}</span> #{runner.player.jerseyNumber} {runner.player.name} · {runner.routeName}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </div>
+      <button
+        type="button"
+        onClick={handleClearPlay}
+        className="h-9 rounded-lg border border-border bg-surface px-3 text-sm font-medium text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground pointer-coarse:h-11"
+      >
+        Use a single route instead
+      </button>
+    </section>
+  ) : null;
 
   const offenseSection = (
       <section key="offense" aria-label={category === "DEFENSE" ? "Opposing offense" : "Receiver and route"} className="flex flex-col gap-3">
@@ -235,9 +267,11 @@ export const SetupPanel = () => {
       </section>
 
 
-      {category === "DEFENSE" ? [defensivePlaySection, offenseSection] : [offenseSection, defensivePlaySection]}
+      {category === "DEFENSE"
+        ? [defensivePlaySection, teamSection ?? offenseSection]
+        : [teamSection ?? offenseSection, defensivePlaySection]}
 
-      {mode === "TACTICAL" && (
+      {mode === "TACTICAL" && !activePlay && (
         <section aria-label="Decision trigger" className="rounded-lg border border-mode-live/40 bg-mode-live/5 p-3">
           <LabeledSelect
             id="select-trigger"

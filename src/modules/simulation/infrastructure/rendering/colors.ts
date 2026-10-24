@@ -23,6 +23,10 @@ export const CANVAS_COLORS = {
   routeGhost: "rgba(255,255,255,0.42)",
   routeActive: "#ffffff",
   routeOutlet: "rgba(255,255,255,0.5)",
+  routeX: "#ffffff",
+  routeY: "#e69f00",
+  routeZ: "#56b4e9",
+  routeC: "#f4a3c2",
   cut: "#ffc233",
 
   pursuit: "#ff8a5c",

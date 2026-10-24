@@ -21,6 +21,8 @@ type PlaybookWorkspaceProps = {
   onAssign: (route: Route, receiver: PlayerProfile) => void;
   /** Category switcher shown above the filters (e.g. Offense / Defense). */
   tabs?: ReactNode;
+  /** Extra controls on the same row as the category switcher, such as the plays/routes toggle. */
+  toolbar?: ReactNode;
 };
 
 type RouteFilter = "ALL" | "BREAKING" | "VERTICAL";
@@ -78,7 +80,7 @@ const RouteCard = ({ route, receivers, onAssign }: RouteCardProps) => {
   );
 };
 
-export const PlaybookWorkspace = ({ receivers, onAssign, tabs }: PlaybookWorkspaceProps) => {
+export const PlaybookWorkspace = ({ receivers, onAssign, tabs, toolbar }: PlaybookWorkspaceProps) => {
   const { data: routes, isLoading, errorMessage, refresh } = useRoutes();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<RouteFilter>("ALL");
@@ -155,7 +157,10 @@ export const PlaybookWorkspace = ({ receivers, onAssign, tabs }: PlaybookWorkspa
         description="Route library. Yellow diamonds mark cuts; blue dot is the receiver at the line of scrimmage."
       />
       <div className="flex flex-col gap-4 px-4 pb-8 md:px-8">
-        {tabs}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {tabs}
+          {toolbar}
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <div role="group" aria-label="Filter routes" className="flex flex-wrap gap-1.5">
             {FILTERS.map(({ value, label }) => (

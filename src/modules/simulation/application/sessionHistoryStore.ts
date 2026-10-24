@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { OutcomeResult, PlayCall, PlayCategory, PlayOutcome, SimulationMode } from "../domain/types";
+import type { OutcomeResult, PlayCategory, PlayOutcome, SimulationMode } from "../domain/types";
 import { getDefensivePlay } from "../domain/defensivePlays";
 import { useSimulationStore } from "./simulationStore";
 
@@ -12,7 +12,7 @@ export type SessionEntry = {
   routeName: string;
   defenseName: string;
   /** Action the user called, or null when the play ran in View Only mode. */
-  decision: PlayCall | null;
+  decision: string | null;
   result: OutcomeResult;
   yardsGained: number;
   touchdown: boolean;
@@ -21,8 +21,8 @@ export type SessionEntry = {
 
 type SessionHistoryStore = {
   entries: SessionEntry[];
-  pendingDecision: PlayCall | null;
-  recordDecision: (action: PlayCall) => void;
+  pendingDecision: string | null;
+  recordDecision: (action: string) => void;
   recordOutcome: (outcome: PlayOutcome) => void;
   clear: () => void;
 };
@@ -45,13 +45,13 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set, get) => 
   recordOutcome: (outcome) => {
     const { sim } = useSimulationStore.getState();
     if (!sim) return;
-    const { receiver, route, mode, category } = sim.config;
+    const { receiver, route, mode, category, teamPlay } = sim.config;
     const entry: SessionEntry = {
       id: (entryCounter += 1),
       mode,
       category,
-      receiverLabel: `#${receiver.jerseyNumber} ${receiver.name}`,
-      routeName: route.name,
+      receiverLabel: teamPlay ? "5-on-5" : `#${receiver.jerseyNumber} ${receiver.name}`,
+      routeName: teamPlay ? teamPlay.playName : route.name,
       defenseName: getDefensivePlay(sim.config.defensivePlayId).name,
       decision: mode === "TACTICAL" ? get().pendingDecision : null,
       result: outcome.result,

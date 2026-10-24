@@ -68,9 +68,6 @@ export const AppSidebar = () => {
           );
         })}
       </ul>
-      <p className="hidden px-5 pb-4 text-xs text-muted-foreground xl:block">
-        Season 2026 · Film room
-      </p>
     </nav>
   );
 };

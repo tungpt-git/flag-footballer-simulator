@@ -73,6 +73,7 @@ import {
 } from "./outcome";
 import { type DefenderCall, getDefensivePlay } from "./defensivePlays";
 import { nextRandom } from "./rng";
+import { TEAM_READ_SEC } from "./teamPlay";
 
 export const ENTITY_IDS = {
   receiver: "receiver",
@@ -133,6 +134,14 @@ export type SimulationState = {
   attributes: Record<string, EntityAttributes>;
   /** Fixed spot each zone defender holds, keyed by entity id. */
   zoneAnchors: Record<string, Vec2>;
+  /** Man or zone responsibility for each 5-on-5 coverage defender. Empty for a one-receiver snap. */
+  defenderAssignments: Record<string, { runnerId: string; call: DefenderCall }>;
+  /** Seconds after the snap until each runner's first cut. */
+  breakTimeById: Record<string, number>;
+  /** Deepest route and the defender over it. Null on a one-receiver snap. */
+  teamFocus: { defenderId: string; runnerId: string } | null;
+  /** Skill player the quarterback threw to, when the engine picked the target. */
+  offenseTargetId: string | null;
   runners: Record<string, RunnerRuntime>;
   decisionPoint: DecisionPoint;
   breakTimeSec: number;
@@ -168,7 +177,7 @@ const buildAttributes = (metrics: PlayerMetrics): EntityAttributes => ({
   catchProbability: metrics.catchProbability,
 });
 
-const buildEntity = (id: string, role: EntityRole, label: number, pos: Vec2): SimEntity => ({
+const buildEntity = (id: string, role: EntityRole, label: string | number, pos: Vec2): SimEntity => ({
   id,
   role,
   label: String(label),
@@ -191,6 +200,8 @@ const getDefenders = (state: SimulationState): SimEntity[] =>
 
 /** The call for a coverage defender: the cornerback has his own, every other defender plays the safety's. */
 const getDefenderCall = (state: SimulationState, entityId: string): DefenderCall => {
+  const assignment = state.defenderAssignments[entityId];
+  if (assignment) return assignment.call;
   const defense = getDefensivePlay(state.config.defensivePlayId);
   return entityId === ENTITY_IDS.cornerback ? defense.cornerback : defense.safety;
 };
@@ -218,7 +229,13 @@ const cloneState = (state: SimulationState): SimulationState => ({
   entities: state.entities.map((entity) => ({ ...entity })),
   ball: state.ball ? { ...state.ball } : null,
   pendingDecision: state.pendingDecision
-    ? ({ ...state.pendingDecision, options: [...state.pendingDecision.options] } as PendingDecision)
+    ? ({
+        ...state.pendingDecision,
+        options: [...state.pendingDecision.options],
+        ...(state.pendingDecision.category === "OFFENSE" && state.pendingDecision.choices
+          ? { choices: state.pendingDecision.choices.map((choice) => ({ ...choice })) }
+          : {}),
+      } as PendingDecision)
     : null,
   flight: state.flight ? { ...state.flight } : null,
   scramble: state.scramble ? { ...state.scramble } : null,
@@ -227,7 +244,93 @@ const cloneState = (state: SimulationState): SimulationState => ({
 
 // ---------- Creation ----------
 
+const createTeamSimulation = (config: SimulationConfig): SimulationState => {
+  const team = config.teamPlay;
+  if (!team) throw new Error("Team play is missing");
+
+  const { losY } = config;
+  const defense = getDefensivePlay(config.defensivePlayId);
+  const coverMan = defense.cornerback.coverage.kind === "MAN";
+  const entities: SimEntity[] = [];
+  const attributes: Record<string, EntityAttributes> = {};
+  const runners: Record<string, RunnerRuntime> = {};
+  const zoneAnchors: Record<string, Vec2> = {};
+  const defenderAssignments: SimulationState["defenderAssignments"] = {};
+  const breakTimeById: Record<string, number> = {};
+
+  team.runners.forEach((runner) => {
+    const runtime = createRunnerRuntime(runner.points, runner.player.metrics);
+    entities.push(buildEntity(runner.id, "RECEIVER", runner.id, { ...runner.points[0] }));
+    attributes[runner.id] = buildAttributes(runner.player.metrics);
+    runners[runner.id] = runtime;
+    const breakArc = runtime.cuts[0]?.arc ?? runtime.path.totalLength * 0.6;
+    breakTimeById[runner.id] = timeToReachArc(runtime, breakArc);
+  });
+
+  team.defenders.forEach((defender, index) => {
+    const runner = team.runners.find((candidate) => candidate.id === defender.runnerId) ?? team.runners[index];
+    const id = `db-${runner.id}`;
+    const call = coverMan || index < 2 ? defense.cornerback : defense.safety;
+    const alignment = runner.points[0];
+    entities.push(
+      buildEntity(id, "DEFENDER", runner.id, {
+        x: clamp(alignment.x + (index - 1.5) * 1.1, 0.5, FIELD_WIDTH_YD - 0.5),
+        y: losY + call.depthYd,
+      }),
+    );
+    attributes[id] = buildAttributes(defender.player.metrics);
+    defenderAssignments[id] = { runnerId: runner.id, call };
+    if (call.coverage.kind === "ZONE") {
+      zoneAnchors[id] = { x: clamp(alignment.x, 0.5, FIELD_WIDTH_YD - 0.5), y: losY + call.depthYd };
+    }
+  });
+
+  entities.push(
+    buildEntity(ENTITY_IDS.rusher, "RUSHER", config.rusher.jerseyNumber, {
+      x: team.quarterbackPos.x,
+      y: losY + defense.rusher.startDepthYd,
+    }),
+    buildEntity(ENTITY_IDS.quarterback, "QB", config.quarterback.jerseyNumber, { ...team.quarterbackPos }),
+  );
+  attributes[ENTITY_IDS.rusher] = buildAttributes(config.rusher.metrics);
+  attributes[ENTITY_IDS.quarterback] = buildAttributes(config.quarterback.metrics);
+
+  const deepest = team.runners.reduce((best, runner) =>
+    Math.max(...runner.points.map((point) => point.y)) > Math.max(...best.points.map((point) => point.y)) ? runner : best,
+  );
+  const routeEndSec = Math.max(...team.runners.map((runner) => estimateRouteDurationSec(runners[runner.id])));
+
+  return {
+    config,
+    t: 0,
+    phase: "PRE_SNAP",
+    entities,
+    ball: null,
+    pendingDecision: null,
+    outcome: null,
+    attributes,
+    zoneAnchors,
+    runners,
+    defenderAssignments,
+    breakTimeById,
+    teamFocus: { defenderId: `db-${deepest.id}`, runnerId: deepest.id },
+    offenseTargetId: null,
+    decisionPoint: { id: "team_read", trigger: "AT_TIME", timeSec: TEAM_READ_SEC },
+    breakTimeSec: TEAM_READ_SEC,
+    routeEndSec,
+    rngState: config.seed >>> 0,
+    flight: null,
+    scramble: null,
+    lastPullAttemptSec: {},
+    defenseCall: null,
+    offenseDecisionAtSec: null,
+    offenseAction: null,
+  };
+};
+
 export const createSimulation = (config: SimulationConfig): SimulationState => {
+  if (config.teamPlay) return createTeamSimulation(config);
+
   const { losY, alignmentX } = config;
   const inside = getInsideDirection(alignmentX);
 
@@ -295,6 +398,7 @@ export const createSimulation = (config: SimulationConfig): SimulationState => {
     breakWaypointIndex >= 0
       ? receiverRuntime.path.cumulative[breakWaypointIndex]
       : receiverRuntime.path.totalLength * 0.6;
+  const breakTimeSec = timeToReachArc(receiverRuntime, breakArc);
 
   return {
     config,
@@ -307,8 +411,12 @@ export const createSimulation = (config: SimulationConfig): SimulationState => {
     attributes,
     zoneAnchors,
     runners,
+    defenderAssignments: {},
+    breakTimeById: { [ENTITY_IDS.receiver]: breakTimeSec },
+    teamFocus: null,
+    offenseTargetId: null,
     decisionPoint: selectDecisionPoint(config),
-    breakTimeSec: timeToReachArc(receiverRuntime, breakArc),
+    breakTimeSec,
     routeEndSec: estimateRouteDurationSec(receiverRuntime),
     rngState: config.seed >>> 0,
     flight: null,
@@ -322,8 +430,26 @@ export const createSimulation = (config: SimulationConfig): SimulationState => {
 
 // ---------- Metrics / frames ----------
 
+const separationFromDefense = (state: SimulationState, entity: SimEntity): number => {
+  const nearest = findNearestEntity(entity.pos, getDefenders(state));
+  return nearest ? distance(entity.pos, nearest.pos) : 0;
+};
+
+/** The receiver the live readout follows: the throw target, otherwise whoever is most open. */
+const getTrackedReceiver = (state: SimulationState): SimEntity => {
+  if (!state.config.teamPlay) return getEntity(state, ENTITY_IDS.receiver);
+  if (state.ball) {
+    const target = findEntity(state, state.ball.targetId);
+    if (target) return target;
+  }
+  const runners = state.entities.filter((entity) => entity.role === "RECEIVER");
+  return runners.reduce((openest, runner) =>
+    separationFromDefense(state, runner) > separationFromDefense(state, openest) ? runner : openest,
+  );
+};
+
 export const computeFrameMetrics = (state: SimulationState): FrameMetrics => {
-  const receiver = getEntity(state, ENTITY_IDS.receiver);
+  const receiver = getTrackedReceiver(state);
   const quarterback = getEntity(state, ENTITY_IDS.quarterback);
   const rusher = getEntity(state, ENTITY_IDS.rusher);
   const nearest = findNearestEntity(receiver.pos, getDefenders(state));
@@ -416,8 +542,11 @@ const checkQuarterbackPulls = (state: SimulationState, pullerIds: string[], reas
 // ---------- Passing ----------
 
 /** The defenders who are rushing the QB: the rusher, plus the safety once the defense has sent him. */
-const getQuarterbackPullerIds = (state: SimulationState): string[] =>
-  state.defenseCall === "BLITZ_SAFETY" ? [ENTITY_IDS.rusher, ENTITY_IDS.safety] : [ENTITY_IDS.rusher];
+const getQuarterbackPullerIds = (state: SimulationState): string[] => {
+  if (state.defenseCall !== "BLITZ_SAFETY") return [ENTITY_IDS.rusher];
+  const extra = state.teamFocus?.defenderId ?? ENTITY_IDS.safety;
+  return [ENTITY_IDS.rusher, extra];
+};
 
 /** Distance from the closest pass rusher to the QB. */
 const getRusherDistanceToQuarterback = (state: SimulationState): number => {
@@ -426,8 +555,10 @@ const getRusherDistanceToQuarterback = (state: SimulationState): number => {
 };
 
 /** True while the cornerback is gambling on the receiver's route and the ball goes to that receiver. */
-const isGamblingOnTarget = (state: SimulationState, targetId: string): boolean =>
-  state.defenseCall === "JUMP_ROUTE" && targetId === ENTITY_IDS.receiver;
+const isGamblingOnTarget = (state: SimulationState, targetId: string): boolean => {
+  if (state.defenseCall !== "JUMP_ROUTE") return false;
+  return targetId === (state.teamFocus?.runnerId ?? ENTITY_IDS.receiver);
+};
 
 const launchPass = (state: SimulationState, targetId: string): void => {
   const quarterback = getEntity(state, ENTITY_IDS.quarterback);
@@ -469,7 +600,7 @@ const evaluatePass = (state: SimulationState, flight: FlightState): PassEvaluati
     timingScore:
       target.id === ENTITY_IDS.outlet
         ? CHECKDOWN_TIMING_SCORE
-        : Math.round(computeTimingScore(flight.throwSec, state.breakTimeSec) * 100) / 100,
+        : Math.round(computeTimingScore(flight.throwSec, state.breakTimeById[target.id] ?? state.breakTimeSec) * 100) / 100,
     pressure: Math.round(clamp(1 - flight.rusherDistanceAtThrow / PRESSURE_RADIUS_YD, 0, 1) * 100) / 100,
     throwDistanceYd: roundYards(distance(ball.from, ball.to)),
   };
@@ -564,8 +695,11 @@ const getDefenderAim = (
   entity: SimEntity,
 ): { aim: Vec2; targetId: string; holdYd: number } => {
   const attributes = state.attributes[entity.id];
-  const receiver = getEntity(state, ENTITY_IDS.receiver);
   const quarterback = getEntity(state, ENTITY_IDS.quarterback);
+  const coveredRunner = (): SimEntity =>
+    getEntity(state, state.defenderAssignments[entity.id]?.runnerId ?? ENTITY_IDS.receiver);
+  const jumpedDefenderId = state.teamFocus?.defenderId ?? ENTITY_IDS.cornerback;
+  const blitzerId = state.teamFocus?.defenderId ?? ENTITY_IDS.safety;
 
   if (entity.role === "RUSHER") {
     return {
@@ -576,7 +710,7 @@ const getDefenderAim = (
   }
 
   if (state.phase === "BALL_IN_FLIGHT" && state.ball && state.flight) {
-    const ballReactionSec = isGamblingOnTarget(state, state.flight.targetId) && entity.id === ENTITY_IDS.cornerback ? 0 : BALL_REACTION_SEC;
+    const ballReactionSec = isGamblingOnTarget(state, state.flight.targetId) && entity.id === jumpedDefenderId ? 0 : BALL_REACTION_SEC;
     const reactionDone = state.t - state.flight.startSec >= ballReactionSec;
     if (reactionDone) return { aim: state.ball.to, targetId: state.ball.targetId, holdYd: BALL_SPOT_HOLD_YD };
   }
@@ -590,7 +724,7 @@ const getDefenderAim = (
     };
   }
 
-  if (state.defenseCall === "BLITZ_SAFETY" && entity.id === ENTITY_IDS.safety) {
+  if (state.defenseCall === "BLITZ_SAFETY" && entity.id === blitzerId) {
     return {
       aim: computePursuitAim(entity.pos, attributes.topSpeedYps, quarterback, 1),
       targetId: quarterback.id,
@@ -599,6 +733,13 @@ const getDefenderAim = (
   }
 
   const { coverage } = getDefenderCall(state, entity.id);
+  const receiver = coveredRunner();
+  const zoneTarget = state.config.teamPlay
+    ? (findNearestEntity(
+        entity.pos,
+        state.entities.filter((candidate) => candidate.role === "RECEIVER"),
+      ) ?? receiver)
+    : receiver;
   if (coverage.kind === "MAN") {
     return {
       aim: computePursuitAim(entity.pos, attributes.topSpeedYps, receiver, coverage.leadFactor),
@@ -607,12 +748,12 @@ const getDefenderAim = (
     };
   }
 
-  const isReceiverClose = distance(entity.pos, receiver.pos) < coverage.engageDistanceYd;
+  const isReceiverClose = distance(entity.pos, zoneTarget.pos) < coverage.engageDistanceYd;
   return {
     aim: isReceiverClose
-      ? computePursuitAim(entity.pos, attributes.topSpeedYps, receiver, ZONE_ENGAGE_LEAD_FACTOR)
-      : computeZoneAim(state.zoneAnchors[entity.id], receiver, coverage.cushionYd),
-    targetId: receiver.id,
+      ? computePursuitAim(entity.pos, attributes.topSpeedYps, zoneTarget, ZONE_ENGAGE_LEAD_FACTOR)
+      : computeZoneAim(state.zoneAnchors[entity.id], zoneTarget, coverage.cushionYd),
+    targetId: zoneTarget.id,
     holdYd: DEFENDER_HOLD_DISTANCE_YD,
   };
 };
@@ -676,10 +817,24 @@ const hasReachedDecisionPoint = (state: SimulationState): boolean => {
   return (receiver.routeProgress ?? 0) * runtime.path.totalLength >= cutArc - 1e-6;
 };
 
-const buildPendingDecision = (state: SimulationState): PendingDecision =>
-  state.config.category === "DEFENSE"
-    ? { dpId: state.decisionPoint.id, category: "DEFENSE", options: [...ALL_DEFENSIVE_ACTIONS] }
-    : { dpId: state.decisionPoint.id, category: "OFFENSE", options: [...ALL_DECISIONS] };
+const buildPendingDecision = (state: SimulationState): PendingDecision => {
+  if (state.config.category === "DEFENSE") {
+    return { dpId: state.decisionPoint.id, category: "DEFENSE", options: [...ALL_DEFENSIVE_ACTIONS] };
+  }
+  if (state.config.teamPlay) {
+    const choices = [
+      ...state.config.teamPlay.runners.map((runner) => ({
+        id: runner.id,
+        label: `Throw to ${runner.id}`,
+        description: runner.routeName,
+        targetId: runner.id,
+      })),
+      { id: "SCRAMBLE", label: "Scramble", description: "Escape the rush and run.", targetId: null },
+    ];
+    return { dpId: state.decisionPoint.id, category: "OFFENSE", options: ["PUMP_FAKE_SCRAMBLE"], choices };
+  }
+  return { dpId: state.decisionPoint.id, category: "OFFENSE", options: [...ALL_DECISIONS] };
+};
 
 const handleRunning = (state: SimulationState): void => {
   const isTactical = state.config.mode === "TACTICAL";
@@ -696,6 +851,11 @@ const handleRunning = (state: SimulationState): void => {
       state.pendingDecision = buildPendingDecision(state);
       return;
     }
+  }
+
+  if (!isTactical && state.config.teamPlay && hasReachedDecisionPoint(state)) {
+    runEngineOffense(state);
+    return;
   }
 
   const routeIsDone = state.t >= state.routeEndSec + END_OF_ROUTE_HOLD_SEC;
@@ -727,7 +887,9 @@ const handleScramble = (state: SimulationState): void => {
   if (!scramble) return;
 
   const quarterback = getEntity(state, ENTITY_IDS.quarterback);
-  const pullerIds = [ENTITY_IDS.rusher, ENTITY_IDS.cornerback, ENTITY_IDS.safety];
+  const pullerIds = state.config.teamPlay
+    ? state.entities.filter((entity) => entity.role === "RUSHER" || entity.role === "DEFENDER").map((entity) => entity.id)
+    : [ENTITY_IDS.rusher, ENTITY_IDS.cornerback, ENTITY_IDS.safety];
   if (checkQuarterbackPulls(state, pullerIds, "Flag pulled on the scrambling QB")) return;
 
   if (quarterback.pos.y >= GOAL_LINE_Y) {
@@ -788,17 +950,16 @@ export const stepSimulation = (state: SimulationState, deltaSec: number): Simula
 };
 
 /** Carries out an offensive call on `state` in place: a throw, a checkdown or a pump fake and scramble. */
-const performOffenseDecision = (state: SimulationState, action: DecisionAction): void => {
+const performOffenseDecision = (state: SimulationState, action: DecisionAction, targetId?: string): void => {
   state.pendingDecision = null;
 
-  if (action === "PASS_TO_WR") {
-    launchPass(state, ENTITY_IDS.receiver);
+  if (action !== "PUMP_FAKE_SCRAMBLE") {
+    const target = targetId ?? (action === "CHECKDOWN" ? ENTITY_IDS.outlet : ENTITY_IDS.receiver);
+    state.offenseTargetId = target;
+    launchPass(state, target);
     return;
   }
-  if (action === "CHECKDOWN") {
-    launchPass(state, ENTITY_IDS.outlet);
-    return;
-  }
+  state.offenseTargetId = null;
 
   const quarterback = getEntity(state, ENTITY_IDS.quarterback);
   const rusher = getEntity(state, ENTITY_IDS.rusher);
@@ -809,6 +970,18 @@ const performOffenseDecision = (state: SimulationState, action: DecisionAction):
     direction: quarterback.pos.x >= rusher.pos.x ? 1 : -1,
   };
   state.phase = "SCRAMBLING";
+};
+
+/** Applies a 5-on-5 pause choice: a throw to one skill player, or a scramble. */
+export const applyOffenseChoice = (state: SimulationState, choiceId: string): SimulationState => {
+  if (state.phase !== "PAUSED_FOR_DECISION" || state.pendingDecision?.category !== "OFFENSE") return state;
+  const choice = state.pendingDecision.choices?.find((candidate) => candidate.id === choiceId);
+  if (!choice) return state;
+
+  const next = cloneState(state);
+  if (choice.targetId) performOffenseDecision(next, "PASS_TO_WR", choice.targetId);
+  else performOffenseDecision(next, "PUMP_FAKE_SCRAMBLE");
+  return next;
 };
 
 /** Applies the user's choice while the offense is paused at a decision point. */
@@ -824,13 +997,11 @@ export const applyDecision = (state: SimulationState, action: DecisionAction): S
  * Plays a throw or checkdown out on a copy of `state` (which may be paused or just running) to read
  * the odds the ball would face. Returns null for the scramble, which has no pass odds.
  */
-const previewThrow = (state: SimulationState, action: DecisionAction): PassPreview | null => {
-  if (action === "PUMP_FAKE_SCRAMBLE") return null;
-
+const previewThrowTo = (state: SimulationState, targetId: string): PassPreview | null => {
   let lookahead = cloneState(state);
   lookahead.phase = "PAUSED_FOR_DECISION";
   lookahead.offenseDecisionAtSec = null;
-  performOffenseDecision(lookahead, action);
+  performOffenseDecision(lookahead, "PASS_TO_WR", targetId);
 
   const targetDepthYd = roundYards((lookahead.ball?.to.y ?? state.config.losY) - state.config.losY);
   for (let iteration = 0; iteration < 300 && lookahead.phase === "BALL_IN_FLIGHT"; iteration += 1) {
@@ -841,6 +1012,16 @@ const previewThrow = (state: SimulationState, action: DecisionAction): PassPrevi
   if (!outcome?.probabilities || !outcome.metrics) return null;
   return { probabilities: outcome.probabilities, metrics: outcome.metrics, targetDepthYd };
 };
+
+const previewThrow = (state: SimulationState, action: DecisionAction): PassPreview | null => {
+  if (action === "PUMP_FAKE_SCRAMBLE") return null;
+  const targetId = action === "CHECKDOWN" ? ENTITY_IDS.outlet : ENTITY_IDS.receiver;
+  return previewThrowTo(state, targetId);
+};
+
+/** Odds of throwing to one skill player right now. */
+export const previewReceiverThrow = (state: SimulationState, targetId: string): PassPreview | null =>
+  previewThrowTo(state, targetId);
 
 /**
  * Looks ahead (on a copy) to estimate the odds of a pass or checkdown if thrown right now.
@@ -860,11 +1041,41 @@ const chooseEngineOffenseAction = (state: SimulationState): DecisionAction => {
   return score("CHECKDOWN") > score("PASS_TO_WR") ? "CHECKDOWN" : "PASS_TO_WR";
 };
 
+/** The engine-run QB on a 5-on-5 play. Null means he scrambles instead of throwing. */
+const chooseTeamTarget = (state: SimulationState): string | null => {
+  if (getRusherDistanceToQuarterback(state) < QB_SCRAMBLE_TRIGGER_YD) return null;
+
+  const runners = state.entities.filter((entity) => entity.role === "RECEIVER");
+  let bestId = runners[0]?.id ?? null;
+  let bestScore = Number.NEGATIVE_INFINITY;
+  runners.forEach((runner) => {
+    const preview = previewThrowTo(state, runner.id);
+    const score = preview ? preview.probabilities.complete - 2 * preview.probabilities.intercept : Number.NEGATIVE_INFINITY;
+    if (score > bestScore) {
+      bestScore = score;
+      bestId = runner.id;
+    }
+  });
+  return bestId;
+};
+
 /** The engine-run QB reads the defense's call and acts on it, in place. */
 const runEngineOffense = (state: SimulationState): void => {
+  state.offenseDecisionAtSec = null;
+  if (state.config.teamPlay) {
+    const targetId = chooseTeamTarget(state);
+    if (!targetId) {
+      state.offenseAction = "PUMP_FAKE_SCRAMBLE";
+      performOffenseDecision(state, "PUMP_FAKE_SCRAMBLE");
+      return;
+    }
+    state.offenseAction = "PASS_TO_WR";
+    performOffenseDecision(state, "PASS_TO_WR", targetId);
+    return;
+  }
+
   const action = chooseEngineOffenseAction(state);
   state.offenseAction = action;
-  state.offenseDecisionAtSec = null;
   performOffenseDecision(state, action);
 };
 
@@ -891,12 +1102,25 @@ export const applyDefensiveDecision = (state: SimulationState, action: Defensive
 
   const next = cloneState(state);
   const boost = DEFENSIVE_CALL_SPEED_BOOSTS[action];
+  const boostedId = action === "JUMP_ROUTE" && next.teamFocus ? next.teamFocus.defenderId : boost?.entityId;
   next.pendingDecision = null;
   next.defenseCall = action;
-  next.attributes = boost ? scaleTopSpeed(next.attributes, boost.entityId, boost.multiplier) : next.attributes;
+  next.attributes = boost && boostedId ? scaleTopSpeed(next.attributes, boostedId, boost.multiplier) : next.attributes;
   next.offenseDecisionAtSec = next.t + QB_READ_SEC;
   next.phase = "RUNNING";
   return next;
+};
+
+export type RenderableRoute = { id: string; points: Vec2[]; progress: number };
+
+/** One polyline per skill player on a 5-on-5 snap. Empty for a one-receiver snap. */
+export const getRenderableRoutes = (state: SimulationState): RenderableRoute[] => {
+  if (!state.config.teamPlay) return [];
+  return state.config.teamPlay.runners.map((runner) => ({
+    id: runner.id,
+    points: state.runners[runner.id]?.path.points ?? runner.points,
+    progress: findEntity(state, runner.id)?.routeProgress ?? 0,
+  }));
 };
 
 /** Absolute route polyline for rendering the receiver's route. */
