@@ -37,7 +37,7 @@ const RootLayout = ({ children }: LayoutProps<"/">) => (
     <head>
       <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
     </head>
-    <body className="flex h-dvh flex-col">
+    <body className="relative flex h-dvh flex-col">
       <TooltipProvider>
         <AppHeader modeSwitcher={<ModeSwitcher />} />
         <div className="flex min-h-0 flex-1">

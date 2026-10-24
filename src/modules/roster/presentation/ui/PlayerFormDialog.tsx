@@ -1,30 +1,38 @@
 "use client";
 
-import { useState } from "react";
-import { Controller, useForm, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { AlertCircle, Loader2 } from "lucide-react";
-import { toast } from "sonner";
+import { PositionGlyph } from "@/shared/ui/PositionGlyph";
 import { Button } from "@/shared/ui/primitives/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/shared/ui/primitives/dialog";
+  Drawer,
+  DrawerBody,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/shared/ui/primitives/drawer";
 import { FormField } from "@/shared/ui/primitives/form-field";
 import { Input } from "@/shared/ui/primitives/input";
 import { LabeledSelect } from "@/shared/ui/primitives/labeled-select";
 import { Slider } from "@/shared/ui/primitives/slider";
-import { PositionGlyph } from "@/shared/ui/PositionGlyph";
 import { StatMeter } from "@/shared/ui/StatMeter";
-import { createPlayer, updatePlayer } from "../../infrastructure/playerApiClient";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertCircle, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Controller, useForm, useWatch } from "react-hook-form";
+import { toast } from "sonner";
 import { dashToMetersPerSecond } from "../../domain/athletics";
-import { POSITIONS, normalizeAltPositions, type PlayerProfile, type Position } from "../../domain/player";
+import {
+  POSITIONS,
+  normalizeAltPositions,
+  type PlayerProfile,
+  type Position,
+} from "../../domain/player";
+import {
+  createPlayer,
+  updatePlayer,
+} from "../../infrastructure/playerApiClient";
 import { POSITION_LABELS, getMetricLabels } from "../labels";
-import { AltPositionPicker } from "./AltPositionPicker";
 import { dashToScore, type MetricScores } from "../metricScores";
 import {
   PlayerFormValues,
@@ -33,6 +41,7 @@ import {
   toFormValues,
   toPlayerInput,
 } from "../playerForm";
+import { AltPositionPicker } from "./AltPositionPicker";
 
 type PlayerFormDialogProps = {
   /** Player being edited, or null to create a new one. */
@@ -44,7 +53,10 @@ type PlayerFormDialogProps = {
   teamAverage?: MetricScores | null;
 };
 
-type PlayerFormProps = Pick<PlayerFormDialogProps, "player" | "onSaved" | "teamAverage"> & { onClose: () => void };
+type PlayerFormProps = Pick<
+  PlayerFormDialogProps,
+  "player" | "onSaved" | "teamAverage"
+> & { onClose: () => void };
 
 type SliderMetric = {
   fieldName: "agility" | "catchPercent" | "flagPullPercent";
@@ -54,19 +66,45 @@ type SliderMetric = {
 };
 
 const SLIDER_METRICS: SliderMetric[] = [
-  { fieldName: "agility", id: "player-agility", metricKey: "agility", scoreKey: "agility" },
-  { fieldName: "catchPercent", id: "player-catch", metricKey: "catchProbability", scoreKey: "catching" },
-  { fieldName: "flagPullPercent", id: "player-flag", metricKey: "flagPullEfficiency", scoreKey: "flagPull" },
+  {
+    fieldName: "agility",
+    id: "player-agility",
+    metricKey: "agility",
+    scoreKey: "agility",
+  },
+  {
+    fieldName: "catchPercent",
+    id: "player-catch",
+    metricKey: "catchProbability",
+    scoreKey: "catching",
+  },
+  {
+    fieldName: "flagPullPercent",
+    id: "player-flag",
+    metricKey: "flagPullEfficiency",
+    scoreKey: "flagPull",
+  },
 ];
 
-const SectionLegend = ({ children }: { children: string }) => <legend className="caption-label mb-3">{children}</legend>;
+const SectionLegend = ({ children }: { children: string }) => (
+  <legend className="caption-label mb-3">{children}</legend>
+);
 
-const POSITION_OPTIONS = POSITIONS.map((position) => ({ value: position, label: `${position} - ${POSITION_LABELS[position]}` }));
+const POSITION_OPTIONS = POSITIONS.map((position) => ({
+  value: position,
+  label: `${position} - ${POSITION_LABELS[position]}`,
+}));
 
-const isPosition = (value: string): value is Position => POSITIONS.includes(value as Position);
+const isPosition = (value: string): value is Position =>
+  POSITIONS.includes(value as Position);
 
-/** Mounted only while the dialog is open, so every open starts from fresh form state. */
-const PlayerForm = ({ player, onClose, onSaved, teamAverage }: PlayerFormProps) => {
+/** Mounted only while the drawer is open, so every open starts from fresh form state. */
+const PlayerForm = ({
+  player,
+  onClose,
+  onSaved,
+  teamAverage,
+}: PlayerFormProps) => {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const {
     register,
@@ -86,7 +124,8 @@ const PlayerForm = ({ player, onClose, onSaved, teamAverage }: PlayerFormProps) 
   const previewName = useWatch({ control, name: "name" });
   const previewJersey = useWatch({ control, name: "jerseyNumber" });
   const metricLabels = getMetricLabels(position);
-  const speedMps = Number.isFinite(dash) && dash > 0 ? dashToMetersPerSecond(dash) : null;
+  const speedMps =
+    Number.isFinite(dash) && dash > 0 ? dashToMetersPerSecond(dash) : null;
 
   const handleSave = handleSubmit(async (values) => {
     setSubmitError(null);
@@ -94,61 +133,119 @@ const PlayerForm = ({ player, onClose, onSaved, teamAverage }: PlayerFormProps) 
       const input = toPlayerInput(values);
       if (player) await updatePlayer(player.id, input);
       else await createPlayer(input);
-      toast.success(player ? `Updated ${input.name}` : `Added ${input.name} to the roster`);
+      toast.success(
+        player ? `Updated ${input.name}` : `Added ${input.name} to the roster`,
+      );
       onSaved();
       onClose();
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Could not save player");
+      setSubmitError(
+        error instanceof Error ? error.message : "Could not save player",
+      );
     }
   });
 
   const handleCancel = (): void => onClose();
 
   /** Switching the main position removes it from the alternatives, so it is never listed twice. */
-  const handleMainPositionChange = (onFieldChange: (value: Position) => void) => (value: string): void => {
-    if (!isPosition(value)) return;
-    onFieldChange(value);
-    setValue("altPositions", normalizeAltPositions(value, getValues("altPositions")));
-  };
+  const handleMainPositionChange =
+    (onFieldChange: (value: Position) => void) =>
+    (value: string): void => {
+      if (!isPosition(value)) return;
+      onFieldChange(value);
+      setValue(
+        "altPositions",
+        normalizeAltPositions(value, getValues("altPositions")),
+      );
+    };
 
-  const errorFor = (name: keyof PlayerFormValues): string | undefined => errors[name]?.message;
+  const errorFor = (name: keyof PlayerFormValues): string | undefined =>
+    errors[name]?.message;
 
   const hasDash = Number.isFinite(dash) && dash > 0;
   const hasJersey = Number.isFinite(previewJersey);
 
   return (
-    <form onSubmit={handleSave} noValidate className="flex min-h-full flex-col">
-      <DialogHeader className="gap-3 border-b border-border bg-muted/40 px-5 py-4 md:rounded-tl-2xl">
+    <form
+      onSubmit={handleSave}
+      noValidate
+      className="flex min-h-0 flex-1 flex-col"
+    >
+      <DrawerHeader className="gap-3 border-b border-border bg-muted/40 px-5 pt-[max(1rem,env(safe-area-inset-top))] pb-4">
         <div className="flex items-center gap-4">
-          <span className="min-w-[3.5rem] font-display text-[3.5rem] leading-[0.85] font-semibold text-foreground tabular" aria-hidden="true">
+          <span
+            className="min-w-[3.5rem] font-display text-[3.5rem] leading-[0.85] font-semibold text-foreground tabular"
+            aria-hidden="true"
+          >
             {hasJersey ? previewJersey : "--"}
           </span>
           <div className="min-w-0 pr-8">
-            <DialogTitle className="truncate text-heading">{player ? `Edit ${player.name}` : "New player"}</DialogTitle>
-            <p className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground" aria-live="polite">
+            <DrawerTitle className="truncate text-heading">
+              {player ? `Edit ${player.name}` : "New player"}
+            </DrawerTitle>
+            <p
+              className="mt-1 flex items-center gap-1.5 text-sm text-muted-foreground"
+              aria-live="polite"
+            >
               <PositionGlyph position={position} />
-              <span className="truncate">{previewName?.trim() ? previewName : "Unnamed player"}</span>
+              <span className="truncate">
+                {previewName?.trim() ? previewName : "Unnamed player"}
+              </span>
             </p>
           </div>
         </div>
-        <DialogDescription>Speed and agility drive the route simulator; hands and flag pulling decide contested plays.</DialogDescription>
-      </DialogHeader>
+        <DrawerDescription>
+          Speed and agility drive the route simulator; hands and flag pulling
+          decide contested plays.
+        </DrawerDescription>
+      </DrawerHeader>
 
-      <div className="flex flex-1 flex-col gap-6 px-5 py-5">
+      <DrawerBody className="flex flex-col gap-6 px-5 py-5">
         {submitError && (
-          <div role="alert" className="flex gap-2 rounded-lg border border-danger/40 bg-danger-soft p-3 text-sm text-foreground">
-            <AlertCircle className="mt-0.5 size-4 shrink-0 text-danger" aria-hidden="true" />
+          <div
+            role="alert"
+            className="flex gap-2 rounded-lg border border-danger/40 bg-danger-soft p-3 text-sm text-foreground"
+          >
+            <AlertCircle
+              className="mt-0.5 size-4 shrink-0 text-danger"
+              aria-hidden="true"
+            />
             {submitError}
           </div>
         )}
 
         <fieldset className="grid gap-3 sm:grid-cols-6">
           <SectionLegend>Bio</SectionLegend>
-          <FormField id="player-name" label="Name" error={errorFor("name")} className="sm:col-span-4">
-            <Input id="player-name" autoComplete="off" aria-invalid={!!errors.name} aria-describedby={errors.name ? "player-name-error" : undefined} {...register("name")} />
+          <FormField
+            id="player-name"
+            label="Name"
+            error={errorFor("name")}
+            className="sm:col-span-4"
+          >
+            <Input
+              id="player-name"
+              autoComplete="off"
+              aria-invalid={!!errors.name}
+              aria-describedby={errors.name ? "player-name-error" : undefined}
+              {...register("name")}
+            />
           </FormField>
-          <FormField id="player-jersey" label="Jersey #" error={errorFor("jerseyNumber")} className="sm:col-span-2">
-            <Input id="player-jersey" type="number" inputMode="numeric" aria-invalid={!!errors.jerseyNumber} aria-describedby={errors.jerseyNumber ? "player-jersey-error" : undefined} {...register("jerseyNumber", { valueAsNumber: true })} />
+          <FormField
+            id="player-jersey"
+            label="Jersey #"
+            error={errorFor("jerseyNumber")}
+            className="sm:col-span-2"
+          >
+            <Input
+              id="player-jersey"
+              type="number"
+              inputMode="numeric"
+              aria-invalid={!!errors.jerseyNumber}
+              aria-describedby={
+                errors.jerseyNumber ? "player-jersey-error" : undefined
+              }
+              {...register("jerseyNumber", { valueAsNumber: true })}
+            />
           </FormField>
           <div className="sm:col-span-6">
             <Controller
@@ -169,7 +266,13 @@ const PlayerForm = ({ player, onClose, onSaved, teamAverage }: PlayerFormProps) 
             <Controller
               control={control}
               name="altPositions"
-              render={({ field }) => <AltPositionPicker mainPosition={position} value={field.value} onChange={field.onChange} />}
+              render={({ field }) => (
+                <AltPositionPicker
+                  mainPosition={position}
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
             />
           </div>
         </fieldset>
@@ -180,12 +283,31 @@ const PlayerForm = ({ player, onClose, onSaved, teamAverage }: PlayerFormProps) 
             id="player-dash"
             label={metricLabels.fortyYardDash.label}
             error={errorFor("fortyYardDash")}
-            hint={speedMps ? `${speedMps.toFixed(2)} m/s average. ${metricLabels.fortyYardDash.hint}` : metricLabels.fortyYardDash.hint}
+            hint={
+              speedMps
+                ? `${speedMps.toFixed(2)} m/s average. ${metricLabels.fortyYardDash.hint}`
+                : metricLabels.fortyYardDash.hint
+            }
           >
-            <Input id="player-dash" type="number" step="0.01" inputMode="decimal" aria-invalid={!!errors.fortyYardDash} aria-describedby={errors.fortyYardDash ? "player-dash-error" : "player-dash-hint"} {...register("fortyYardDash", { valueAsNumber: true })} />
+            <Input
+              id="player-dash"
+              type="number"
+              step="0.01"
+              inputMode="decimal"
+              aria-invalid={!!errors.fortyYardDash}
+              aria-describedby={
+                errors.fortyYardDash ? "player-dash-error" : "player-dash-hint"
+              }
+              {...register("fortyYardDash", { valueAsNumber: true })}
+            />
           </FormField>
           {hasDash && (
-            <StatMeter label="Speed rating" score={dashToScore(dash)} averageScore={teamAverage?.speed} display={`${Math.round(dashToScore(dash))}/100`} />
+            <StatMeter
+              label="Speed rating"
+              score={dashToScore(dash)}
+              averageScore={teamAverage?.speed}
+              display={`${Math.round(dashToScore(dash))}/100`}
+            />
           )}
 
           {SLIDER_METRICS.map(({ fieldName, id, metricKey, scoreKey }) => (
@@ -196,13 +318,19 @@ const PlayerForm = ({ player, onClose, onSaved, teamAverage }: PlayerFormProps) 
               render={({ field }) => {
                 const value = Number.isFinite(field.value) ? field.value : 0;
                 const unit = fieldName === "agility" ? "" : "%";
-                const average = teamAverage ? Math.round(teamAverage[scoreKey]) : null;
+                const average = teamAverage
+                  ? Math.round(teamAverage[scoreKey])
+                  : null;
                 return (
                   <FormField
                     id={id}
                     label={`${metricLabels[metricKey].label}: ${value}${unit}`}
                     error={errorFor(fieldName)}
-                    hint={average === null ? metricLabels[metricKey].hint : `${metricLabels[metricKey].hint} Team average: ${average}${unit}.`}
+                    hint={
+                      average === null
+                        ? metricLabels[metricKey].hint
+                        : `${metricLabels[metricKey].hint} Team average: ${average}${unit}.`
+                    }
                   >
                     <Slider
                       id={id}
@@ -210,8 +338,11 @@ const PlayerForm = ({ player, onClose, onSaved, teamAverage }: PlayerFormProps) 
                       max={100}
                       step={1}
                       value={[value]}
-                      onValueChange={(next) => field.onChange(Array.isArray(next) ? next[0] : next)}
+                      onValueChange={(next) =>
+                        field.onChange(Array.isArray(next) ? next[0] : next)
+                      }
                       aria-label={metricLabels[metricKey].label}
+                      data-base-ui-swipe-ignore="x"
                       className="py-2"
                     />
                   </FormField>
@@ -232,34 +363,61 @@ const PlayerForm = ({ player, onClose, onSaved, teamAverage }: PlayerFormProps) 
               ["interceptions", "Interceptions"],
             ] as const
           ).map(([fieldName, label]) => (
-            <FormField key={fieldName} id={`player-${fieldName}`} label={label} error={errorFor(fieldName)}>
-              <Input id={`player-${fieldName}`} type="number" inputMode="numeric" aria-invalid={!!errors[fieldName]} aria-describedby={errors[fieldName] ? `player-${fieldName}-error` : undefined} {...register(fieldName, { valueAsNumber: true })} />
+            <FormField
+              key={fieldName}
+              id={`player-${fieldName}`}
+              label={label}
+              error={errorFor(fieldName)}
+            >
+              <Input
+                id={`player-${fieldName}`}
+                type="number"
+                inputMode="numeric"
+                aria-invalid={!!errors[fieldName]}
+                aria-describedby={
+                  errors[fieldName] ? `player-${fieldName}-error` : undefined
+                }
+                {...register(fieldName, { valueAsNumber: true })}
+              />
             </FormField>
           ))}
         </fieldset>
-      </div>
+      </DrawerBody>
 
-      <DialogFooter className="sticky bottom-0 mx-0 mb-0 flex-row justify-end border-t border-border bg-popover px-5 py-3">
+      <DrawerFooter className="pb-[max(0.75rem,env(safe-area-inset-bottom))]">
         <Button type="button" variant="outline" onClick={handleCancel}>
           Cancel
         </Button>
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting && <Loader2 className="animate-spin" aria-hidden="true" />}
+          {isSubmitting && (
+            <Loader2 className="animate-spin" aria-hidden="true" />
+          )}
           {player ? "Save changes" : "Create player"}
         </Button>
-      </DialogFooter>
+      </DrawerFooter>
     </form>
   );
 };
 
-export const PlayerFormDialog = ({ player, open, onOpenChange, onSaved, teamAverage }: PlayerFormDialogProps) => {
+export const PlayerFormDialog = ({
+  player,
+  open,
+  onOpenChange,
+  onSaved,
+  teamAverage,
+}: PlayerFormDialogProps) => {
   const handleClose = (): void => onOpenChange(false);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent variant="sheet">
-        <PlayerForm player={player} onClose={handleClose} onSaved={onSaved} teamAverage={teamAverage} />
-      </DialogContent>
-    </Dialog>
+    <Drawer open={open} onOpenChange={onOpenChange} swipeDirection="right">
+      <DrawerContent>
+        <PlayerForm
+          player={player}
+          onClose={handleClose}
+          onSaved={onSaved}
+          teamAverage={teamAverage}
+        />
+      </DrawerContent>
+    </Drawer>
   );
 };
