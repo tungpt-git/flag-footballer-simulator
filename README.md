@@ -14,7 +14,7 @@ npm install
 cp .env.example .env        # DATABASE_URL for the Docker database
 npm run db:up               # postgres:16 in Docker
 npx prisma migrate dev      # create tables
-npm run db:seed             # 34 players (replaces the roster) + 5 routes
+npm run db:seed             # 34 players (replaces the roster) + 12 routes
 npm run dev                 # http://localhost:3000
 ```
 
@@ -121,7 +121,8 @@ Field units are yards. `x` is lateral (0 to 30), `y` is downfield: 0 is midfield
 ## How the simulation works
 
 - **Receiver:** follows the route polyline at `(40 / dash) * 1.12` yd/s, ramping up from the snap and slowing into sharp cuts. Agility reduces the cut penalty.
-- **Defenders:** lead-pursuit aim (solves `|P_rec + V_rec * t - P_def| = speed * t`), limited by top speed and agility-based acceleration so they lag at cuts. The safety plays zone, and the rusher chases the QB after a short delay.
+- **Defenders:** lead-pursuit aim (solves `|P_rec + V_rec * t - P_def| = speed * t`), limited by top speed and agility-based acceleration so they lag at cuts. Each defensive play (Man Free, Press Man, Cover 2 Zone, Bracket Double Team, All-Out Blitz, Prevent Deep Zone) sets how the cornerback and safety line up and cover (man or zone) and when the rusher breaks (`modules/simulation/domain/defensivePlays.ts`). The rusher chases the QB after that play's delay.
+- **Offense vs. defense:** every play has a category. As OFFENSE you call the throw while the engine runs the defense. As DEFENSE (Playbook → Defense tab → "Run live", or the simulator's "Coach the" switch) the engine runs the offense and the play pauses for your call: Hold coverage, Jump the route (faster break and a higher interception chance, but he can be beaten by a double move) or Blitz the safety (adds a second rusher). The Playbook page splits into OFFENSE (routes) and DEFENSE (defensive plays) tabs.
 - **Throws:** the ball is led to the receiver's projected position. At arrival the odds come from separation, speed difference, timing relative to the cut, pressure and throw distance (`modules/simulation/domain/outcome.ts`). The rolls then decide complete, intercepted or incomplete, followed by a flag-pull check on the catch.
 - **Determinism:** the engine steps at a fixed 1/120 s and uses a seeded RNG, so a given seed always replays the same way.
 - **Rendering:** `FieldCanvas` runs one `requestAnimationFrame` loop that reads the Zustand store directly, so React does not re-render every frame.

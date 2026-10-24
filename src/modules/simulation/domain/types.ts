@@ -1,6 +1,7 @@
 import type { Vec2 } from "@/shared/kernel/geometry";
 import type { DecisionTrigger, Route } from "@/modules/playbook";
 import type { PlayerProfile } from "@/modules/roster";
+import type { DefensivePlayId } from "./defensivePlays";
 
 export type SimulationMode = "VIEW" | "TACTICAL";
 
@@ -8,6 +9,15 @@ export type SimulationMode = "VIEW" | "TACTICAL";
 export type FieldViewMode = "PLAY" | "FULL";
 
 export type DecisionAction = "PASS_TO_WR" | "PUMP_FAKE_SCRAMBLE" | "CHECKDOWN";
+
+/** Which side of the ball the user coaches. The other side is run by the engine. */
+export type PlayCategory = "OFFENSE" | "DEFENSE";
+
+/** The defense's live call when the play pauses (interactive defense). */
+export type DefensiveAction = "HOLD_COVERAGE" | "JUMP_ROUTE" | "BLITZ_SAFETY";
+
+/** Any call the user can make at a pause, on either side of the ball. */
+export type PlayCall = DecisionAction | DefensiveAction;
 
 export type OutcomeResult =
   | "COMPLETED_PASS"
@@ -65,10 +75,9 @@ export type PlayOutcome = {
   metrics?: PassMetrics;
 };
 
-export type PendingDecision = {
-  dpId: string;
-  options: DecisionAction[];
-};
+export type PendingDecision =
+  | { dpId: string; category: "OFFENSE"; options: DecisionAction[] }
+  | { dpId: string; category: "DEFENSE"; options: DefensiveAction[] };
 
 export type BallState = {
   from: Vec2;
@@ -107,7 +116,10 @@ export type SimulationLineup = {
 /** Everything needed to start one play. */
 export type SimulationConfig = SimulationLineup & {
   mode: SimulationMode;
+  category: PlayCategory;
   route: Route;
+  /** The defensive call the offense is running against. */
+  defensivePlayId: DefensivePlayId;
   decisionTrigger: DecisionTrigger;
   /** Line of scrimmage, in field yards. */
   losY: number;

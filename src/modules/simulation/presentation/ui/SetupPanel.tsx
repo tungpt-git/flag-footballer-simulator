@@ -8,7 +8,9 @@ import { createRunnerRuntime, estimateRouteDurationSec } from "../../domain/move
 import { canPlayPosition, dashToMetersPerSecond, type PlayerProfile, type Position } from "@/modules/roster";
 import { resolveRoutePoints } from "@/modules/playbook";
 import { RouteThumbnail } from "@/modules/playbook/ui";
-import { TRIGGER_LABELS } from "../../domain/labels";
+import { DEFENSIVE_PLAYS, getDefensivePlay, type DefensivePlayId } from "../../domain/defensivePlays";
+import { CATEGORY_LABELS, TRIGGER_LABELS } from "../../domain/labels";
+import type { PlayCategory } from "../../domain/types";
 import { cn } from "@/shared/ui/utils";
 import {
   getAlignmentX,
@@ -16,6 +18,8 @@ import {
   type AlignmentSide,
   type LineupRole,
 } from "../../application/simulationStore";
+
+const CATEGORY_OPTIONS: PlayCategory[] = ["OFFENSE", "DEFENSE"];
 
 const ALIGNMENT_OPTIONS: { value: AlignmentSide; label: string }[] = [
   { value: "LEFT", label: "Left" },
@@ -34,9 +38,13 @@ type PlayerSelectConfig = { role: LineupRole; position: Position; label: string;
 
 const DEFENSE_SELECTS: PlayerSelectConfig[] = [
   { role: "quarterbackId", position: "QB", label: "Quarterback", id: "select-qb" },
-  { role: "cornerbackId", position: "DB", label: "Defender (man coverage)", id: "select-db" },
+  { role: "cornerbackId", position: "DB", label: "Defender (cornerback)", id: "select-db" },
   { role: "rusherId", position: "RUSHER", label: "Rusher", id: "select-rusher" },
 ];
+
+const DEFENSIVE_PLAY_OPTIONS: SelectOption[] = DEFENSIVE_PLAYS.map((play) => ({ value: play.id, label: play.name }));
+
+const isDefensivePlayId = (value: string): value is DefensivePlayId => DEFENSIVE_PLAYS.some((play) => play.id === value);
 
 const SectionTitle = ({ children, id }: { children: string; id?: string }) => (
   <h3 id={id} className="caption-label mb-2">
@@ -92,14 +100,18 @@ const RouteSummary = () => {
 
 export const SetupPanel = () => {
   const mode = useSimulationStore((state) => state.mode);
+  const category = useSimulationStore((state) => state.category);
+  const setCategory = useSimulationStore((state) => state.setCategory);
   const players = useSimulationStore((state) => state.players);
   const routes = useSimulationStore((state) => state.routes);
   const lineup = useSimulationStore((state) => state.lineup);
   const routeId = useSimulationStore((state) => state.routeId);
+  const defensivePlayId = useSimulationStore((state) => state.defensivePlayId);
   const trigger = useSimulationStore((state) => state.trigger);
   const alignmentSide = useSimulationStore((state) => state.alignmentSide);
   const setLineupPlayer = useSimulationStore((state) => state.setLineupPlayer);
   const setRouteId = useSimulationStore((state) => state.setRouteId);
+  const setDefensivePlayId = useSimulationStore((state) => state.setDefensivePlayId);
   const setTrigger = useSimulationStore((state) => state.setTrigger);
   const setAlignmentSide = useSimulationStore((state) => state.setAlignmentSide);
 
@@ -113,14 +125,17 @@ export const SetupPanel = () => {
 
   const handleTriggerChange = (value: string): void => setTrigger(value === "AT_TIME" ? "AT_TIME" : "AT_CUT");
   const handleAlignmentChange = (side: AlignmentSide) => (): void => setAlignmentSide(side);
+  const handleDefensivePlayChange = (value: string): void => {
+    if (isDefensivePlayId(value)) setDefensivePlayId(value);
+  };
   const handleRouteClick = (id: string) => (): void => setRouteId(id);
+  const handleCategoryClick = (option: PlayCategory) => (): void => setCategory(option);
 
-  return (
-    <div className="flex flex-col gap-5">
-      <section aria-label="Receiver and route" className="flex flex-col gap-3">
+  const offenseSection = (
+      <section key="offense" aria-label={category === "DEFENSE" ? "Opposing offense" : "Receiver and route"} className="flex flex-col gap-3">
         <LabeledSelect
           id="select-receiver"
-          label="Receiver"
+          label={category === "DEFENSE" ? "Opposing receiver" : "Receiver"}
           value={lineup.receiverId}
           options={buildPlayerOptions(players, "WR")}
           onChange={(value) => setLineupPlayer("receiverId", value)}
@@ -128,7 +143,7 @@ export const SetupPanel = () => {
         />
 
         <div>
-          <SectionTitle id="route-picker-label">Route</SectionTitle>
+          <SectionTitle id="route-picker-label">{category === "DEFENSE" ? "Route they run" : "Route"}</SectionTitle>
           <div role="radiogroup" aria-labelledby="route-picker-label" className="grid grid-cols-3 gap-2">
             {routes.map((route) => {
               const isSelected = route.id === routeId;
@@ -178,6 +193,49 @@ export const SetupPanel = () => {
 
         <RouteSummary />
       </section>
+  );
+
+  const defensivePlaySection = (
+      <section key="defense" aria-label="Defensive play">
+        <LabeledSelect
+          id="select-defensive-play"
+          label="Defensive play"
+          value={defensivePlayId}
+          options={DEFENSIVE_PLAY_OPTIONS}
+          onChange={handleDefensivePlayChange}
+          hint={getDefensivePlay(defensivePlayId).blurb}
+        />
+      </section>
+  );
+
+  return (
+    <div className="flex flex-col gap-5">
+      <section aria-label="Side of the ball">
+        <SectionTitle id="category-label">Coach the</SectionTitle>
+        <div role="radiogroup" aria-labelledby="category-label" className="inline-flex w-full overflow-hidden rounded-lg border border-border bg-background">
+          {CATEGORY_OPTIONS.map((option) => {
+            const isSelected = category === option;
+            return (
+              <button
+                key={option}
+                type="button"
+                role="radio"
+                aria-checked={isSelected}
+                onClick={handleCategoryClick(option)}
+                className={cn(
+                  "h-9 flex-1 border-r border-border text-sm font-medium text-muted-foreground transition-colors duration-150 last:border-r-0 hover:bg-accent hover:text-foreground pointer-coarse:h-11",
+                  isSelected && "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground",
+                )}
+              >
+                {CATEGORY_LABELS[option]}
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+
+      {category === "DEFENSE" ? [defensivePlaySection, offenseSection] : [offenseSection, defensivePlaySection]}
 
       {mode === "TACTICAL" && (
         <section aria-label="Decision trigger" className="rounded-lg border border-mode-live/40 bg-mode-live/5 p-3">

@@ -5,3 +5,5 @@ export { SessionHistory } from "./presentation/ui/SessionHistory";
 export { useAssignRouteToSimulator } from "./presentation/useAssignRouteToSimulator";
 export { SessionSummary } from "./presentation/ui/SessionHistory";
 export { useLaunchSimulator } from "./presentation/useLaunchSimulator";
+export { useRunDefensivePlay } from "./presentation/useRunDefensivePlay";
+export { DefensePlaybook } from "./presentation/ui/DefensePlaybook";

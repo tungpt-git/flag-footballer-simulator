@@ -4,11 +4,11 @@ import { useEffect, useRef } from "react";
 import { Button } from "@/shared/ui/primitives/button";
 import { formatPercent } from "@/shared/ui/format";
 import { cn } from "@/shared/ui/utils";
-import { DECISION_DESCRIPTIONS, DECISION_LABELS, TRIGGER_LABELS } from "../../domain/labels";
+import { CALL_DESCRIPTIONS, CALL_LABELS, TRIGGER_LABELS } from "../../domain/labels";
 import { useSessionHistoryStore } from "../../application/sessionHistoryStore";
 import { useSimulationStore } from "../../application/simulationStore";
-import type { DecisionAction } from "../../domain/types";
-import { DECISION_PRESENTATION, KEY_TO_ACTION, getPressureLevel, type PressureLevel } from "../decisionCopy";
+import type { DecisionAction, DefensiveAction, PlayCall } from "../../domain/types";
+import { CALL_PRESENTATION, findCallByShortcut, getPressureLevel, type PressureLevel } from "../decisionCopy";
 
 const PRESSURE_STYLES: Record<PressureLevel, { label: string; segments: number; className: string }> = {
   LOW: { label: "Low pressure", segments: 1, className: "bg-success" },
@@ -57,6 +57,7 @@ export const DecisionDialog = () => {
   const previews = useSimulationStore((state) => state.decisionPreviews);
   const rusherDistance = useSimulationStore((state) => state.snapshot?.metrics.rusherDistanceYd ?? null);
   const submitDecision = useSimulationStore((state) => state.submitDecision);
+  const submitDefensiveDecision = useSimulationStore((state) => state.submitDefensiveDecision);
   const recordDecision = useSessionHistoryStore((state) => state.recordDecision);
   const firstOptionRef = useRef<HTMLButtonElement>(null);
 
@@ -65,24 +66,30 @@ export const DecisionDialog = () => {
     firstOptionRef.current?.focus({ preventScroll: true });
 
     const handleKeyDown = (event: KeyboardEvent): void => {
-      const action = KEY_TO_ACTION[event.key];
-      if (!action || event.metaKey || event.ctrlKey || event.altKey || !pendingDecision.options.includes(action)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      const action = findCallByShortcut<PlayCall>(pendingDecision.options, event.key);
+      if (!action) return;
       recordDecision(action);
-      submitDecision(action);
+      if (pendingDecision.category === "DEFENSE") submitDefensiveDecision(action as DefensiveAction);
+      else submitDecision(action as DecisionAction);
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [pendingDecision, submitDecision, recordDecision]);
+  }, [pendingDecision, submitDecision, submitDefensiveDecision, recordDecision]);
 
   if (!pendingDecision) return null;
 
-  const handleChoose = (action: DecisionAction) => (): void => {
+  const isDefense = pendingDecision.category === "DEFENSE";
+  const options: PlayCall[] = pendingDecision.options;
+
+  const handleChoose = (action: PlayCall) => (): void => {
     recordDecision(action);
-    submitDecision(action);
+    if (isDefense) submitDefensiveDecision(action as DefensiveAction);
+    else submitDecision(action as DecisionAction);
   };
 
-  const renderOdds = (action: DecisionAction) => {
-    const preview = previews[action];
+  const renderOdds = (action: PlayCall) => {
+    const preview = previews[action as DecisionAction];
     if (!preview) return null;
     return (
       <span className="hidden flex-wrap gap-1 md:flex">
@@ -104,7 +111,7 @@ export const DecisionDialog = () => {
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-b border-border px-3 py-2">
           <h2 id="decision-title" className="flex items-center gap-2 font-display text-lg font-semibold uppercase tracking-wide text-foreground">
             <span className="size-2.5 animate-pulse-ring rounded-full bg-mode-live" aria-hidden="true" />
-            Your call
+            {isDefense ? "Defensive call" : "Your call"}
             <span className="font-mono text-xs font-medium text-muted-foreground tabular normal-case">t = {pausedAtSec.toFixed(2)}s</span>
           </h2>
           <PressureMeter rusherDistanceYd={rusherDistance} />
@@ -114,8 +121,8 @@ export const DecisionDialog = () => {
         </div>
 
         <ul className="grid grid-cols-3 gap-1.5 p-2 md:gap-2">
-          {pendingDecision.options.map((action, index) => {
-            const { icon: Icon, shortcut, risk, reward } = DECISION_PRESENTATION[action];
+          {options.map((action, index) => {
+            const { icon: Icon, shortcut, risk, reward } = CALL_PRESENTATION[action];
             return (
               <li key={action} className="flex">
                 <Button
@@ -130,13 +137,13 @@ export const DecisionDialog = () => {
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-mode-live/15 text-mode-live">
                       <Icon className="size-4.5" aria-hidden="true" />
                     </span>
-                    <span className="min-w-0 flex-1 font-display text-sm leading-tight font-semibold uppercase tracking-wide md:text-base">{DECISION_LABELS[action]}</span>
+                    <span className="min-w-0 flex-1 font-display text-sm leading-tight font-semibold uppercase tracking-wide md:text-base">{CALL_LABELS[action]}</span>
                     <kbd className="hidden size-6 shrink-0 items-center justify-center rounded-md border border-border bg-muted font-mono text-xs font-semibold text-foreground md:flex">
                       {shortcut}
                     </kbd>
                   </span>
                   <span id={`decision-hint-${action}`} className="hidden flex-col gap-0.5 text-xs font-normal sm:flex">
-                    <span className="sr-only">{DECISION_DESCRIPTIONS[action]}</span>
+                    <span className="sr-only">{CALL_DESCRIPTIONS[action]}</span>
                     <span className="text-success">
                       <span className="font-semibold">+ </span>
                       {reward}

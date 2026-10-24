@@ -42,6 +42,47 @@ export const ROUTE_TEMPLATE_POINTS: Record<RouteType, Vec2[]> = {
     { x: 7, y: 20 },
     { x: 9, y: 24 },
   ],
+  DRAG: [
+    { x: 0, y: 0 },
+    { x: 0, y: 2 },
+    { x: 7, y: 3 },
+    { x: 15, y: 3.5 },
+  ],
+  FLAT: [
+    { x: 0, y: 0 },
+    { x: 0, y: 1 },
+    { x: -4, y: 3 },
+  ],
+  COMEBACK: [
+    { x: 0, y: 0 },
+    { x: 0, y: 14 },
+    { x: -3, y: 11 },
+  ],
+  CORNER: [
+    { x: 0, y: 0 },
+    { x: 0, y: 10 },
+    { x: -4, y: 16 },
+    { x: -5, y: 19 },
+  ],
+  WHEEL: [
+    { x: 0, y: 0 },
+    { x: 0, y: 1 },
+    { x: -4, y: 3 },
+    { x: -4.5, y: 12 },
+    { x: -4.5, y: 24 },
+  ],
+  FADE: [
+    { x: 0, y: 0 },
+    { x: 0, y: 5 },
+    { x: -3, y: 24 },
+  ],
+  SLUGGO: [
+    { x: 0, y: 0 },
+    { x: 0, y: 3 },
+    { x: 5, y: 7 },
+    { x: 3, y: 10 },
+    { x: 3, y: 26 },
+  ],
 };
 
 export const ROUTE_NAMES: Record<RouteType, string> = {
@@ -50,6 +91,13 @@ export const ROUTE_NAMES: Record<RouteType, string> = {
   GO: "Go",
   HOOK: "Hook",
   POST: "Post",
+  DRAG: "Drag",
+  FLAT: "Flat",
+  COMEBACK: "Comeback",
+  CORNER: "Corner",
+  WHEEL: "Wheel",
+  FADE: "Fade",
+  SLUGGO: "Sluggo",
 };
 
 export const ROUTE_TYPES = Object.keys(ROUTE_TEMPLATE_POINTS) as RouteType[];

@@ -23,6 +23,13 @@ enum RouteType {
   GO
   HOOK
   POST
+  DRAG
+  FLAT
+  COMEBACK
+  CORNER
+  WHEEL
+  FADE
+  SLUGGO
 }
 
 model Player {

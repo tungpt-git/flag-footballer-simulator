@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AlertCircle, ArrowRight, RotateCw, Search, SearchX } from "lucide-react";
 import type { PlayerProfile } from "@/modules/roster";
 import { PageHeading } from "@/shared/ui/layout/PageHeading";
@@ -19,6 +19,8 @@ type PlaybookWorkspaceProps = {
   receivers: PlayerProfile[];
   /** Called when a route is assigned to a receiver (the host decides what that means, e.g. open the simulator). */
   onAssign: (route: Route, receiver: PlayerProfile) => void;
+  /** Category switcher shown above the filters (e.g. Offense / Defense). */
+  tabs?: ReactNode;
 };
 
 type RouteFilter = "ALL" | "BREAKING" | "VERTICAL";
@@ -76,7 +78,7 @@ const RouteCard = ({ route, receivers, onAssign }: RouteCardProps) => {
   );
 };
 
-export const PlaybookWorkspace = ({ receivers, onAssign }: PlaybookWorkspaceProps) => {
+export const PlaybookWorkspace = ({ receivers, onAssign, tabs }: PlaybookWorkspaceProps) => {
   const { data: routes, isLoading, errorMessage, refresh } = useRoutes();
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<RouteFilter>("ALL");
@@ -153,6 +155,7 @@ export const PlaybookWorkspace = ({ receivers, onAssign }: PlaybookWorkspaceProp
         description="Route library. Yellow diamonds mark cuts; blue dot is the receiver at the line of scrimmage."
       />
       <div className="flex flex-col gap-4 px-4 pb-8 md:px-8">
+        {tabs}
         <div className="flex flex-wrap items-center gap-3">
           <div role="group" aria-label="Filter routes" className="flex flex-wrap gap-1.5">
             {FILTERS.map(({ value, label }) => (

@@ -5,8 +5,10 @@ import { RotateCcw, Shuffle, SkipForward, Star, X } from "lucide-react";
 import { Button } from "@/shared/ui/primitives/button";
 import { formatPercent } from "@/shared/ui/format";
 import { cn } from "@/shared/ui/utils";
+import { Badge } from "@/shared/ui/primitives/badge";
 import { OUTCOME_LABELS } from "../../domain/labels";
 import type { PassMetrics, PlayOutcome } from "../../domain/types";
+import { isSuccessfulResult } from "../../application/sessionHistoryStore";
 import { useSimulationStore } from "../../application/simulationStore";
 import { OUTCOME_STYLES } from "../outcomeStyles";
 
@@ -44,6 +46,7 @@ const OddsSegment = ({ label, value, className }: OddsSegmentProps) =>
 export const OutcomeBanner = () => {
   const outcome = useSimulationStore((state) => state.sim?.outcome ?? null);
   const mode = useSimulationStore((state) => state.sim?.config.mode ?? "VIEW");
+  const category = useSimulationStore((state) => state.sim?.config.category ?? "OFFENSE");
   const routes = useSimulationStore((state) => state.routes);
   const routeId = useSimulationStore((state) => state.routeId);
   const play = useSimulationStore((state) => state.play);
@@ -97,6 +100,11 @@ export const OutcomeBanner = () => {
                 {OUTCOME_LABELS[outcome.result]}
               </h2>
               <span className="font-display text-xl font-semibold text-foreground tabular md:text-2xl">{formatYards(outcome.yardsGained)}</span>
+              {category === "DEFENSE" && (
+                <Badge variant={isSuccessfulResult(outcome.result, "DEFENSE") ? "success" : "danger"}>
+                  {isSuccessfulResult(outcome.result, "DEFENSE") ? "Defensive stop" : "Offense wins the play"}
+                </Badge>
+              )}
               {outcome.touchdown && (
                 <span className="inline-flex items-center gap-1 rounded-full bg-warning px-2 py-0.5 text-xs font-bold text-background">
                   <Star className="size-3 fill-current" aria-hidden="true" />

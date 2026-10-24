@@ -1,15 +1,18 @@
 import { create } from "zustand";
-import type { DecisionAction, OutcomeResult, PlayOutcome, SimulationMode } from "../domain/types";
+import type { OutcomeResult, PlayCall, PlayCategory, PlayOutcome, SimulationMode } from "../domain/types";
+import { getDefensivePlay } from "../domain/defensivePlays";
 import { useSimulationStore } from "./simulationStore";
 
 /** One finished play in the current browser session. */
 export type SessionEntry = {
   id: number;
   mode: SimulationMode;
+  category: PlayCategory;
   receiverLabel: string;
   routeName: string;
+  defenseName: string;
   /** Action the user called, or null when the play ran in View Only mode. */
-  decision: DecisionAction | null;
+  decision: PlayCall | null;
   result: OutcomeResult;
   yardsGained: number;
   touchdown: boolean;
@@ -18,16 +21,18 @@ export type SessionEntry = {
 
 type SessionHistoryStore = {
   entries: SessionEntry[];
-  pendingDecision: DecisionAction | null;
-  recordDecision: (action: DecisionAction) => void;
+  pendingDecision: PlayCall | null;
+  recordDecision: (action: PlayCall) => void;
   recordOutcome: (outcome: PlayOutcome) => void;
   clear: () => void;
 };
 
 /** Results that count as a win for the offense. */
-const SUCCESS_RESULTS: OutcomeResult[] = ["COMPLETED_PASS", "SCRAMBLE_GAIN"];
+const OFFENSE_WIN_RESULTS: OutcomeResult[] = ["COMPLETED_PASS", "SCRAMBLE_GAIN"];
 
-export const isSuccessfulResult = (result: OutcomeResult): boolean => SUCCESS_RESULTS.includes(result);
+/** A play succeeds for the side the user coached: the offense wins on a gain, the defense on a stop. */
+export const isSuccessfulResult = (result: OutcomeResult, category: PlayCategory = "OFFENSE"): boolean =>
+  OFFENSE_WIN_RESULTS.includes(result) === (category === "OFFENSE");
 
 let entryCounter = 0;
 
@@ -40,12 +45,14 @@ export const useSessionHistoryStore = create<SessionHistoryStore>((set, get) => 
   recordOutcome: (outcome) => {
     const { sim } = useSimulationStore.getState();
     if (!sim) return;
-    const { receiver, route, mode } = sim.config;
+    const { receiver, route, mode, category } = sim.config;
     const entry: SessionEntry = {
       id: (entryCounter += 1),
       mode,
+      category,
       receiverLabel: `#${receiver.jerseyNumber} ${receiver.name}`,
       routeName: route.name,
+      defenseName: getDefensivePlay(sim.config.defensivePlayId).name,
       decision: mode === "TACTICAL" ? get().pendingDecision : null,
       result: outcome.result,
       yardsGained: outcome.yardsGained,

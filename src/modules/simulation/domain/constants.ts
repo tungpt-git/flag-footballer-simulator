@@ -28,6 +28,17 @@ export const PULL_ATTEMPT_INTERVAL_SEC = 0.25;
 export const PUMP_FAKE_SEC = 0.4;
 export const SCRAMBLE_MAX_SEC = 5;
 
+// ---------- Interactive defense ----------
+/** How long the engine-run QB reads the defense's live call before he throws. */
+export const QB_READ_SEC = 0.8;
+/** The QB scrambles instead of throwing when a rusher is this close. */
+export const QB_SCRAMBLE_TRIGGER_YD = 2;
+export const JUMP_ROUTE_SPEED_MULTIPLIER = 1.12;
+export const JUMP_ROUTE_INTERCEPT_MULTIPLIER = 1.7;
+/** A cornerback who gambled and lost is this much further from the catch than the sim measures. */
+export const JUMP_ROUTE_OVERCOMMIT_YD = 3;
+export const BLITZ_RUSHER_SPEED_MULTIPLIER = 1.25;
+
 // ---------- Default (fallback) profiles ----------
 const emptyStats = { targets: 0, receptions: 0, yards: 0, flagPulls: 0, interceptions: 0 };
 

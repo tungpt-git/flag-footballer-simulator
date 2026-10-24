@@ -1,4 +1,16 @@
-export type RouteType = "SLANT" | "OUT" | "GO" | "HOOK" | "POST";
+export type RouteType =
+  | "SLANT"
+  | "OUT"
+  | "GO"
+  | "HOOK"
+  | "POST"
+  | "DRAG"
+  | "FLAT"
+  | "COMEBACK"
+  | "CORNER"
+  | "WHEEL"
+  | "FADE"
+  | "SLUGGO";
 
 export type RouteWaypoint = {
   /** Lateral offset in yards from alignment. +x is toward the field center ("inside"). */

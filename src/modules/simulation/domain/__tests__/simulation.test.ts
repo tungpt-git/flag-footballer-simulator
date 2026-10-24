@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_CORNERBACK, DEFAULT_QUARTERBACK, DEFAULT_RUSHER } from "../constants";
+import { DEFENSIVE_PLAYS, type DefensivePlayId } from "../defensivePlays";
 import { DEFAULT_LOS_Y } from "@/shared/kernel/field";
 import { createRunnerRuntime, estimateRouteDurationSec } from "../movement";
 import {
@@ -12,13 +13,14 @@ import {
   ENTITY_IDS,
   SimulationState,
   applyDecision,
+  applyDefensiveDecision,
   createSimulation,
   getFrame,
   previewDecision,
   stepSimulation,
 } from "../simulation";
 import type { PlayerProfile } from "@/modules/roster";
-import type { SimulationConfig, SimulationMode } from "../types";
+import type { PlayCategory, SimulationConfig, SimulationMode } from "../types";
 
 const buildReceiver = (fortyYardDash: number, agility = 80): PlayerProfile => ({
   id: "wr",
@@ -33,14 +35,18 @@ const buildReceiver = (fortyYardDash: number, agility = 80): PlayerProfile => ({
 const buildConfig = (
   overrides: Partial<{
     mode: SimulationMode;
+    category: PlayCategory;
     routeType: RouteType;
+    defense: DefensivePlayId;
     trigger: DecisionTrigger;
     receiver: PlayerProfile;
     seed: number;
   }> = {},
 ): SimulationConfig => ({
   mode: overrides.mode ?? "VIEW",
+  category: overrides.category ?? "OFFENSE",
   route: { id: "r", ...buildRouteFromTemplate(overrides.routeType ?? "SLANT") },
+  defensivePlayId: overrides.defense ?? "MAN_FREE",
   decisionTrigger: overrides.trigger ?? "AT_TIME",
   losY: DEFAULT_LOS_Y,
   alignmentX: 6,
@@ -185,5 +191,118 @@ describe("tactical mode", () => {
     const completionRate = ((counts.COMPLETED_PASS ?? 0) + (counts.FLAG_PULLED ?? 0)) / 200;
     expect(completionRate).toBeGreaterThan(0.3);
     expect(completionRate).toBeLessThan(0.95);
+  });
+});
+
+describe("defensive plays", () => {
+  const defenseIds = DEFENSIVE_PLAYS.map((play) => play.id);
+
+  it("offers more than one defensive play, each with a unique id", () => {
+    expect(defenseIds.length).toBeGreaterThan(1);
+    expect(new Set(defenseIds).size).toBe(defenseIds.length);
+  });
+
+  it.each(defenseIds)("%s lines the defenders up at its depths and plays out", (defense) => {
+    const play = DEFENSIVE_PLAYS.find((candidate) => candidate.id === defense);
+    const initial = createSimulation(buildConfig({ defense }));
+
+    expect(getEntity(initial, ENTITY_IDS.cornerback).pos.y).toBe(DEFAULT_LOS_Y + (play?.cornerback.depthYd ?? NaN));
+    expect(getEntity(initial, ENTITY_IDS.safety).pos.y).toBe(DEFAULT_LOS_Y + (play?.safety.depthYd ?? NaN));
+    expect(getEntity(initial, ENTITY_IDS.rusher).pos.y).toBe(DEFAULT_LOS_Y + (play?.rusher.startDepthYd ?? NaN));
+    expect(runToEnd(initial).phase).toBe("FINISHED");
+  });
+
+  it.each(defenseIds)("%s resolves a tactical pass without errors", (defense) => {
+    const paused = runToEnd(createSimulation(buildConfig({ mode: "TACTICAL", trigger: "AT_CUT", defense })));
+    if (paused.phase === "FINISHED") return;
+
+    const end = runToEnd(applyDecision(paused, "PASS_TO_WR"));
+    expect(end.phase).toBe("FINISHED");
+  });
+
+  it("a blitz gets the rusher to the quarterback sooner than the standard rush", () => {
+    const distanceAfter = (defense: DefensivePlayId): number => {
+      const state = stepSimulation(createSimulation(buildConfig({ mode: "TACTICAL", defense })), 1.6);
+      return getFrame(state).metrics.rusherDistanceYd;
+    };
+
+    expect(distanceAfter("BLITZ")).toBeLessThan(distanceAfter("MAN_FREE"));
+    expect(distanceAfter("PREVENT")).toBeGreaterThan(distanceAfter("MAN_FREE"));
+  });
+
+  it("only zone defenders get an anchor, shaded toward the receiver for a zone cornerback", () => {
+    const man = createSimulation(buildConfig({ defense: "MAN_FREE" }));
+    const zone = createSimulation(buildConfig({ defense: "ZONE" }));
+
+    expect(Object.keys(man.zoneAnchors)).toEqual([ENTITY_IDS.safety]);
+    expect(Object.keys(zone.zoneAnchors).sort()).toEqual([ENTITY_IDS.cornerback, ENTITY_IDS.safety].sort());
+    expect(zone.zoneAnchors[ENTITY_IDS.cornerback].x).toBeLessThan(zone.zoneAnchors[ENTITY_IDS.safety].x);
+  });
+
+  it("is deterministic for every defensive play", () => {
+    defenseIds.forEach((defense) => {
+      const first = runToEnd(createSimulation(buildConfig({ mode: "TACTICAL", defense })));
+      const second = runToEnd(createSimulation(buildConfig({ mode: "TACTICAL", defense })));
+      expect(getFrame(first)).toEqual(getFrame(second));
+    });
+  });
+});
+
+describe("interactive defense", () => {
+  const pauseOnDefense = (seed = 42, defense: DefensivePlayId = "MAN_FREE"): SimulationState =>
+    runToEnd(createSimulation(buildConfig({ mode: "TACTICAL", category: "DEFENSE", trigger: "AT_TIME", defense, seed })));
+
+  it("pauses the defense with defensive options instead of passing options", () => {
+    const paused = pauseOnDefense();
+
+    expect(paused.phase).toBe("PAUSED_FOR_DECISION");
+    expect(paused.pendingDecision?.category).toBe("DEFENSE");
+    expect(paused.pendingDecision?.options).toEqual(["HOLD_COVERAGE", "JUMP_ROUTE", "BLITZ_SAFETY"]);
+  });
+
+  it("keeps offering the throwing options when the user coaches the offense", () => {
+    const paused = runToEnd(createSimulation(buildConfig({ mode: "TACTICAL", category: "OFFENSE" })));
+
+    expect(paused.pendingDecision?.category).toBe("OFFENSE");
+  });
+
+  it("ignores an offensive decision while the defense is the one deciding", () => {
+    const paused = pauseOnDefense();
+
+    expect(applyDecision(paused, "PASS_TO_WR")).toBe(paused);
+  });
+
+  it.each(["HOLD_COVERAGE", "JUMP_ROUTE", "BLITZ_SAFETY"] as const)("%s resumes the play and the engine quarterback finishes it", (action) => {
+    const paused = pauseOnDefense();
+    const resumed = applyDefensiveDecision(paused, action);
+
+    expect(resumed.phase).toBe("RUNNING");
+    expect(resumed.pendingDecision).toBeNull();
+    expect(runToEnd(resumed, 1 / 60, 4000).phase).toBe("FINISHED");
+  });
+
+  it("does not mutate the paused state when a call is made", () => {
+    const paused = pauseOnDefense();
+    const snapshot = structuredClone(getFrame(paused));
+
+    applyDefensiveDecision(paused, "BLITZ_SAFETY");
+
+    expect(getFrame(paused)).toEqual(snapshot);
+    expect(paused.phase).toBe("PAUSED_FOR_DECISION");
+  });
+
+  it("is deterministic for the same call and seed", () => {
+    const play = (): SimulationState => runToEnd(applyDefensiveDecision(pauseOnDefense(7), "JUMP_ROUTE"), 1 / 60, 4000);
+
+    expect(getFrame(play())).toEqual(getFrame(play()));
+  });
+
+  it("sending the safety on a blitz brings him toward the quarterback instead of holding the deep zone", () => {
+    const safetyDepthAfter = (action: "HOLD_COVERAGE" | "BLITZ_SAFETY"): number => {
+      const resumed = applyDefensiveDecision(pauseOnDefense(), action);
+      return getEntity(stepSimulation(resumed, 0.5), ENTITY_IDS.safety).pos.y;
+    };
+
+    expect(safetyDepthAfter("BLITZ_SAFETY")).toBeLessThan(safetyDepthAfter("HOLD_COVERAGE"));
   });
 });

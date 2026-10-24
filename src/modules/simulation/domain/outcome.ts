@@ -38,6 +38,8 @@ export type PassModelInput = PassMetrics & {
   targetCatchProbability: number;
   /** Nearest defender's ball skills, 0-1. */
   defenderBallSkill: number;
+  /** Scales the interception chance (a gambling defender raises it). Defaults to 1. */
+  interceptMultiplier?: number;
 };
 
 /**
@@ -59,7 +61,10 @@ export const computePassProbabilities = (input: PassModelInput): PassProbabiliti
 
   const closeness = clamp(1 - input.separationYd / INTERCEPT_CLOSENESS_RADIUS_YD, 0, 1);
   const interceptSkill = 0.45 * clamp(input.defenderBallSkill, 0, 1) + 0.55 * closeness;
-  const intercept = (1 - open) * INTERCEPT_SCALE * interceptSkill;
+  const intercept = Math.min(
+    (1 - open) * INTERCEPT_SCALE * interceptSkill * (input.interceptMultiplier ?? 1),
+    1 - complete,
+  );
 
   const incomplete = Math.max(0, 1 - complete - intercept);
   return { open, complete, intercept, incomplete };

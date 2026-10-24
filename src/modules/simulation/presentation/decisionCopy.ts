@@ -1,8 +1,10 @@
-import { CornerDownLeft, Shuffle, Target, type LucideIcon } from "lucide-react";
-import type { DecisionAction } from "../domain/types";
+import { CornerDownLeft, Flame, Shield, Shuffle, Target, Zap, type LucideIcon } from "lucide-react";
+import type { PlayCall } from "../domain/types";
 
-/** Presentation copy for each decision: icon, shortcut and a one-line risk / reward hint. */
-export const DECISION_PRESENTATION: Record<DecisionAction, { icon: LucideIcon; shortcut: string; risk: string; reward: string }> = {
+type CallPresentation = { icon: LucideIcon; shortcut: string; risk: string; reward: string };
+
+/** Presentation copy for each call: icon, shortcut and a one-line risk / reward hint. */
+export const CALL_PRESENTATION: Record<PlayCall, CallPresentation> = {
   PASS_TO_WR: {
     icon: Target,
     shortcut: "1",
@@ -21,11 +23,29 @@ export const DECISION_PRESENTATION: Record<DecisionAction, { icon: LucideIcon; s
     risk: "Short gain only",
     reward: "Safest throw to the outlet",
   },
+  HOLD_COVERAGE: {
+    icon: Shield,
+    shortcut: "1",
+    risk: "No extra pressure on the QB",
+    reward: "Sound coverage, nothing gambled",
+  },
+  JUMP_ROUTE: {
+    icon: Zap,
+    shortcut: "2",
+    risk: "Burned for a big gain if he is beaten",
+    reward: "Much higher interception chance",
+  },
+  BLITZ_SAFETY: {
+    icon: Flame,
+    shortcut: "3",
+    risk: "No safety deep, big plays open up",
+    reward: "Sack chance and a rushed throw",
+  },
 };
 
-export const KEY_TO_ACTION: Record<string, DecisionAction> = Object.fromEntries(
-  (Object.entries(DECISION_PRESENTATION) as [DecisionAction, { shortcut: string }][]).map(([action, { shortcut }]) => [shortcut, action]),
-);
+/** The option a keyboard shortcut selects among the options currently on offer. */
+export const findCallByShortcut = <T extends PlayCall>(options: T[], key: string): T | undefined =>
+  options.find((option) => CALL_PRESENTATION[option].shortcut === key);
 
 export type PressureLevel = "LOW" | "MEDIUM" | "HIGH";
 

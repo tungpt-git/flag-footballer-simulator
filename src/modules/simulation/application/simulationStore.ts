@@ -1,13 +1,16 @@
 import { create } from "zustand";
 import type {
   DecisionAction,
+  DefensiveAction,
   FrameMetrics,
+  PlayCategory,
   SimulationConfig,
   SimulationMode,
   FieldViewMode,
 } from "../domain/types";
 import type { DecisionTrigger, Route } from "@/modules/playbook";
 import { canPlayPosition, type PlayerProfile } from "@/modules/roster";
+import { DEFAULT_DEFENSIVE_PLAY_ID, getDefensivePlay, type DefensivePlayId } from "../domain/defensivePlays";
 import { DEFAULT_CORNERBACK, DEFAULT_QUARTERBACK, DEFAULT_RUSHER } from "../domain/constants";
 import { DEFAULT_LOS_Y, FIELD_WIDTH_YD } from "@/shared/kernel/field";
 import { createSeed } from "../domain/rng";
@@ -15,12 +18,13 @@ import {
   PassPreview,
   SimulationState,
   applyDecision,
+  applyDefensiveDecision,
   computeFrameMetrics,
   createSimulation,
   previewDecision,
   stepSimulation,
 } from "../domain/simulation";
-import { DECISION_LABELS, OUTCOME_LABELS, OUTCOME_TONES } from "../domain/labels";
+import { CALL_LABELS, OUTCOME_LABELS, OUTCOME_TONES } from "../domain/labels";
 import type { Tone } from "@/shared/kernel/tone";
 
 const LEFT_ALIGNMENT_X = 6;
@@ -51,10 +55,12 @@ export type DecisionPreviews = Partial<Record<DecisionAction, PassPreview>>;
 
 type SimulationStore = {
   mode: SimulationMode;
+  category: PlayCategory;
   players: PlayerProfile[];
   routes: Route[];
   lineup: Lineup;
   routeId: string | null;
+  defensivePlayId: DefensivePlayId;
   trigger: DecisionTrigger;
   alignmentSide: AlignmentSide;
   speedMultiplier: number;
@@ -68,8 +74,10 @@ type SimulationStore = {
 
   loadCatalog: (players: PlayerProfile[], routes: Route[]) => void;
   setMode: (mode: SimulationMode) => void;
+  setCategory: (category: PlayCategory) => void;
   setLineupPlayer: (role: LineupRole, playerId: string | null) => void;
   setRouteId: (routeId: string) => void;
+  setDefensivePlayId: (defensivePlayId: DefensivePlayId) => void;
   setTrigger: (trigger: DecisionTrigger) => void;
   setAlignmentSide: (side: AlignmentSide) => void;
   setSpeedMultiplier: (multiplier: number) => void;
@@ -79,6 +87,7 @@ type SimulationStore = {
   reset: () => void;
   tick: (deltaSec: number) => void;
   submitDecision: (action: DecisionAction) => void;
+  submitDefensiveDecision: (action: DefensiveAction) => void;
   clearLog: () => void;
 };
 
@@ -93,7 +102,7 @@ export const getAlignmentX = (side: AlignmentSide): number =>
 
 /** Builds a simulation config from the current selections, or null if no receiver/route is chosen. */
 export const buildSimulationConfig = (
-  store: Pick<SimulationStore, "mode" | "players" | "routes" | "lineup" | "routeId" | "trigger" | "alignmentSide">,
+  store: Pick<SimulationStore, "mode" | "category" | "players" | "routes" | "lineup" | "routeId" | "defensivePlayId" | "trigger" | "alignmentSide">,
   seed: number,
 ): SimulationConfig | null => {
   const receiver = findPlayer(store.players, store.lineup.receiverId);
@@ -102,7 +111,9 @@ export const buildSimulationConfig = (
 
   return {
     mode: store.mode,
+    category: store.category,
     route,
+    defensivePlayId: store.defensivePlayId,
     decisionTrigger: route.decisionPoints.some((point) => point.trigger === store.trigger) ? store.trigger : "AT_TIME",
     losY: DEFAULT_LOS_Y,
     alignmentX: getAlignmentX(store.alignmentSide),
@@ -112,6 +123,13 @@ export const buildSimulationConfig = (
     cornerback: findPlayer(store.players, store.lineup.cornerbackId) ?? DEFAULT_CORNERBACK,
     rusher: findPlayer(store.players, store.lineup.rusherId) ?? DEFAULT_RUSHER,
   };
+};
+
+/** Log line for what the engine-run quarterback decided after reading the defense's call. */
+const describeEngineOffense = (action: DecisionAction): string => {
+  if (action === "PASS_TO_WR") return "The QB reads your call and throws to his receiver.";
+  if (action === "CHECKDOWN") return "The QB reads your call and checks down to the outlet.";
+  return "The QB feels the rush, pump fakes and scrambles.";
 };
 
 let logCounter = 0;
@@ -139,10 +157,12 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
 
   return {
     mode: "VIEW",
+    category: "OFFENSE",
     players: [],
     routes: [],
     lineup: { receiverId: null, quarterbackId: null, cornerbackId: null, rusherId: null },
     routeId: null,
+    defensivePlayId: DEFAULT_DEFENSIVE_PLAY_ID,
     trigger: "AT_CUT",
     alignmentSide: "LEFT",
     speedMultiplier: 1,
@@ -173,8 +193,10 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
     },
 
     setMode: (mode) => rebuild({ mode }),
+    setCategory: (category) => rebuild({ category }),
     setLineupPlayer: (role, playerId) => rebuild({ lineup: { ...get().lineup, [role]: playerId } }),
     setRouteId: (routeId) => rebuild({ routeId }),
+    setDefensivePlayId: (defensivePlayId) => rebuild({ defensivePlayId }),
     setTrigger: (trigger) => rebuild({ trigger }),
     setAlignmentSide: (alignmentSide) => rebuild({ alignmentSide }),
     setSpeedMultiplier: (speedMultiplier) => set({ speedMultiplier }),
@@ -191,9 +213,14 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       if (!sim) return;
 
       if (sim.phase === "PRE_SNAP") {
-        const { receiver, route } = sim.config;
+        const { receiver, route, category } = sim.config;
         const modeLabel = sim.config.mode === "TACTICAL" ? "Tactical" : "Playbook";
-        eventLog = appendLog(eventLog, 0, "neutral", `${modeLabel} snap: #${receiver.jerseyNumber} ${receiver.name} runs a ${route.name}.`);
+        const defenseName = getDefensivePlay(sim.config.defensivePlayId).name;
+        const snapMessage =
+          category === "DEFENSE"
+            ? `${modeLabel} snap: you call ${defenseName} against #${receiver.jerseyNumber} ${receiver.name}'s ${route.name}.`
+            : `${modeLabel} snap: #${receiver.jerseyNumber} ${receiver.name} runs a ${route.name} against ${defenseName}.`;
+        eventLog = appendLog(eventLog, 0, "neutral", snapMessage);
       }
       set({ sim, isPlaying: true, eventLog, decisionPreviews: {}, snapshot: null });
     },
@@ -219,18 +246,21 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
       }
 
       const snapshot = { t: next.t, metrics: computeFrameMetrics(next) };
+      const enginePlayLog = next.offenseAction && !sim.offenseAction ? appendLog(eventLog, next.t, "info", describeEngineOffense(next.offenseAction)) : eventLog;
 
       if (next.phase === "PAUSED_FOR_DECISION") {
         const decisionPreviews: DecisionPreviews = {};
-        (["PASS_TO_WR", "CHECKDOWN"] as const).forEach((action) => {
-          const preview = previewDecision(next, action);
-          if (preview) decisionPreviews[action] = preview;
-        });
+        if (next.config.category === "OFFENSE") {
+          (["PASS_TO_WR", "CHECKDOWN"] as const).forEach((action) => {
+            const preview = previewDecision(next, action);
+            if (preview) decisionPreviews[action] = preview;
+          });
+        }
         set({
           sim: next,
           snapshot,
           decisionPreviews,
-          eventLog: appendLog(eventLog, next.t, "info", `Play paused at ${next.t.toFixed(1)}s. Choose an action.`),
+          eventLog: appendLog(eventLog, next.t, "info", `Play paused at ${next.t.toFixed(1)}s. ${next.config.category === "DEFENSE" ? "Make your defensive call." : "Choose an action."}`),
         });
         return;
       }
@@ -243,17 +273,17 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
           isPlaying: false,
           eventLog: outcome
             ? appendLog(
-                eventLog,
+                enginePlayLog,
                 next.t,
                 OUTCOME_TONES[outcome.result],
                 `${OUTCOME_LABELS[outcome.result]}${outcome.touchdown ? " - TOUCHDOWN" : ""} (${outcome.yardsGained >= 0 ? "+" : ""}${outcome.yardsGained} yd). ${outcome.reason}`,
               )
-            : appendLog(eventLog, next.t, "neutral", "Route complete - end of play."),
+            : appendLog(enginePlayLog, next.t, "neutral", "Route complete - end of play."),
         });
         return;
       }
 
-      set({ sim: next, snapshot });
+      set({ sim: next, snapshot, eventLog: enginePlayLog });
     },
 
     submitDecision: (action) => {
@@ -264,7 +294,19 @@ export const useSimulationStore = create<SimulationStore>((set, get) => {
         sim: applyDecision(sim, action),
         isPlaying: true,
         decisionPreviews: {},
-        eventLog: appendLog(eventLog, sim.t, "neutral", `Decision: ${DECISION_LABELS[action]}.`),
+        eventLog: appendLog(eventLog, sim.t, "neutral", `Decision: ${CALL_LABELS[action]}.`),
+      });
+    },
+
+    submitDefensiveDecision: (action) => {
+      const { sim, eventLog } = get();
+      if (!sim || sim.phase !== "PAUSED_FOR_DECISION") return;
+
+      set({
+        sim: applyDefensiveDecision(sim, action),
+        isPlaying: true,
+        decisionPreviews: {},
+        eventLog: appendLog(eventLog, sim.t, "neutral", `Defensive call: ${CALL_LABELS[action]}.`),
       });
     },
 

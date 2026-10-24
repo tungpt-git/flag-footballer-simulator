@@ -11,7 +11,7 @@
 | :-- | :-- |
 | Maintain player profiles (bio, athletic metrics, season stats) | Create, edit, delete and list. Jersey numbers may repeat. |
 | Maintain a catalog of named routes | Slant, Out, Go, Hook, Post, defined as offsets from the receiver's alignment. Read-only in the UI. |
-| Simulate one pass play, top-down, for one target | One receiver, one man-coverage defender, one safety, one rusher, one outlet receiver. |
+| Simulate one pass play, top-down, for one target | One receiver, one cornerback, one safety, one rusher, one outlet receiver. The offense picks one of 12 routes; the defense runs one of 6 defensive plays (man, press, zone, bracket, blitz, prevent). The user coaches either side (OFFENSE or DEFENSE): defensive plays are interactive, pausing for a defensive call while the engine runs the offense. |
 | View Only mode | Pick receiver and route, press Play, watch the run to the end of the route. |
 | Tactical mode | Pause at 2.5 s or at the route cut, offer Pass to WR, Pump Fake & Scramble or Checkdown, then resolve the outcome. |
 | Reproducible plays | The same seed and the same choices give the same result. |

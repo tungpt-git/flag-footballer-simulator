@@ -7,8 +7,8 @@ import { Badge } from "@/shared/ui/primitives/badge";
 import { Button, buttonVariants } from "@/shared/ui/primitives/button";
 import { formatPercent } from "@/shared/ui/format";
 import { cn } from "@/shared/ui/utils";
-import { DECISION_LABELS, OUTCOME_LABELS } from "../../domain/labels";
-import type { DecisionAction, OutcomeResult } from "../../domain/types";
+import { CALL_LABELS, CATEGORY_LABELS, OUTCOME_LABELS } from "../../domain/labels";
+import type { OutcomeResult, PlayCall } from "../../domain/types";
 import { isSuccessfulResult, useSessionHistoryStore, type SessionEntry } from "../../application/sessionHistoryStore";
 import { OUTCOME_STYLES } from "../outcomeStyles";
 
@@ -32,7 +32,7 @@ type SessionStats = {
 };
 
 export const computeSessionStats = (entries: SessionEntry[]): SessionStats => {
-  const successes = entries.filter((entry) => isSuccessfulResult(entry.result)).length;
+  const successes = entries.filter((entry) => isSuccessfulResult(entry.result, entry.category)).length;
   return {
     plays: entries.length,
     successes,
@@ -80,10 +80,10 @@ const EmptyState = () => (
   </div>
 );
 
-type DecisionRow = { action: DecisionAction; calls: number; successRate: number; averageYards: number };
+type DecisionRow = { action: PlayCall; calls: number; successRate: number; averageYards: number };
 
 const buildDecisionRows = (entries: SessionEntry[]): DecisionRow[] => {
-  const actions = Object.keys(DECISION_LABELS) as DecisionAction[];
+  const actions = Object.keys(CALL_LABELS) as PlayCall[];
   return actions
     .map((action) => {
       const calls = entries.filter((entry) => entry.decision === action);
@@ -216,7 +216,7 @@ export const SessionHistory = () => {
                     <tbody>
                       {decisionRows.map((row) => (
                         <tr key={row.action} className="border-t border-border">
-                          <th scope="row" className="py-2 text-left font-medium text-foreground">{DECISION_LABELS[row.action]}</th>
+                          <th scope="row" className="py-2 text-left font-medium text-foreground">{CALL_LABELS[row.action]}</th>
                           <td className="py-2 text-right font-mono tabular">{row.calls}</td>
                           <td className="py-2 pl-4">
                             <div className="flex items-center gap-2">
@@ -256,11 +256,12 @@ export const SessionHistory = () => {
                               TD
                             </Badge>
                           )}
+                          <Badge variant="outline">{CATEGORY_LABELS[entry.category]}</Badge>
                           <Badge variant={entry.mode === "TACTICAL" ? "warning" : "info"}>{entry.mode === "TACTICAL" ? "Interactive" : "View only"}</Badge>
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {entry.receiverLabel} · {entry.routeName}
-                          {entry.decision && ` · Called: ${DECISION_LABELS[entry.decision]}`}
+                          {entry.receiverLabel} · {entry.routeName} · vs {entry.defenseName}
+                          {entry.decision && ` · Called: ${CALL_LABELS[entry.decision]}`}
                         </p>
                         <p className="mt-0.5 text-sm text-foreground">{entry.reason}</p>
                       </div>

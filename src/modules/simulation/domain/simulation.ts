@@ -1,6 +1,7 @@
 import type {
   BallState,
   DecisionAction,
+  DefensiveAction,
   EntityRole,
   FrameMetrics,
   PassMetrics,
@@ -22,21 +23,24 @@ import type { PlayerMetrics } from "@/modules/roster";
 import { type Vec2, angleBetweenDeg, clamp, distance, lerp, sub } from "@/shared/kernel/geometry";
 import {
   BALL_SPEED_YPS,
+  BLITZ_RUSHER_SPEED_MULTIPLIER,
   DEFAULT_OUTLET,
   DEFAULT_SAFETY,
   DEFENDER_HOLD_DISTANCE_YD,
   DEFENDER_REACTION_SEC,
   END_OF_ROUTE_HOLD_SEC,
   FIXED_STEP_SEC,
-  MAN_COVERAGE_LEAD_FACTOR,
+  JUMP_ROUTE_INTERCEPT_MULTIPLIER,
+  JUMP_ROUTE_OVERCOMMIT_YD,
+  JUMP_ROUTE_SPEED_MULTIPLIER,
   MAX_PLAY_TIME_SEC,
   PULL_ATTEMPT_INTERVAL_SEC,
   PULL_RANGE_YD,
   PUMP_FAKE_SEC,
   QB_DROP_DEPTH_YD,
+  QB_READ_SEC,
+  QB_SCRAMBLE_TRIGGER_YD,
   RELEASE_TIME_SEC,
-  RUSHER_DELAY_SEC,
-  RUSHER_START_DEPTH_YD,
   SCRAMBLE_MAX_SEC,
 } from "./constants";
 import { FIELD_CENTER_X, FIELD_WIDTH_YD, GOAL_LINE_Y } from "@/shared/kernel/field";
@@ -67,6 +71,7 @@ import {
   rollPassResult,
   roundYards,
 } from "./outcome";
+import { type DefenderCall, getDefensivePlay } from "./defensivePlays";
 import { nextRandom } from "./rng";
 
 export const ENTITY_IDS = {
@@ -79,13 +84,13 @@ export const ENTITY_IDS = {
 } as const;
 
 const ALL_DECISIONS: DecisionAction[] = ["PASS_TO_WR", "PUMP_FAKE_SCRAMBLE", "CHECKDOWN"];
+const ALL_DEFENSIVE_ACTIONS: DefensiveAction[] = ["HOLD_COVERAGE", "JUMP_ROUTE", "BLITZ_SAFETY"];
 const CHECKDOWN_TIMING_SCORE = 0.85;
 const PRESSURE_RADIUS_YD = 4;
 const BALL_REACTION_SEC = 0.3;
-const SAFETY_DEPTH_YD = 14;
-const SAFETY_CUSHION_YD = 3;
-const SAFETY_ENGAGE_DISTANCE_YD = 6;
 const QB_CHASE_HOLD_YD = 0.5;
+const ZONE_ANCHOR_RECEIVER_SIDE_BLEND = 0.4;
+const ZONE_ENGAGE_LEAD_FACTOR = 0.5;
 const BALL_SPOT_HOLD_YD = 0.3;
 const SIDELINE_MARGIN_YD = 0.5;
 const SIDELINE_TURN_ZONE_YD = 4;
@@ -126,6 +131,8 @@ export type SimulationState = {
 
   // Engine internals
   attributes: Record<string, EntityAttributes>;
+  /** Fixed spot each zone defender holds, keyed by entity id. */
+  zoneAnchors: Record<string, Vec2>;
   runners: Record<string, RunnerRuntime>;
   decisionPoint: DecisionPoint;
   breakTimeSec: number;
@@ -134,6 +141,14 @@ export type SimulationState = {
   flight: FlightState | null;
   scramble: ScrambleState | null;
   lastPullAttemptSec: Record<string, number>;
+
+  // Interactive defense (the engine plays the offense)
+  /** The defense's live call, once the user has made it. */
+  defenseCall: DefensiveAction | null;
+  /** When the engine-run QB acts on the defense's call, or null when he is not waiting. */
+  offenseDecisionAtSec: number | null;
+  /** What the engine-run QB chose to do. */
+  offenseAction: DecisionAction | null;
 };
 
 export type PassPreview = {
@@ -174,6 +189,12 @@ const findEntity = (state: SimulationState, id: string): SimEntity | undefined =
 const getDefenders = (state: SimulationState): SimEntity[] =>
   state.entities.filter((entity) => entity.role === "DEFENDER");
 
+/** The call for a coverage defender: the cornerback has his own, every other defender plays the safety's. */
+const getDefenderCall = (state: SimulationState, entityId: string): DefenderCall => {
+  const defense = getDefensivePlay(state.config.defensivePlayId);
+  return entityId === ENTITY_IDS.cornerback ? defense.cornerback : defense.safety;
+};
+
 const draw = (state: SimulationState): number => {
   const result = nextRandom(state.rngState);
   state.rngState = result.state;
@@ -197,7 +218,7 @@ const cloneState = (state: SimulationState): SimulationState => ({
   entities: state.entities.map((entity) => ({ ...entity })),
   ball: state.ball ? { ...state.ball } : null,
   pendingDecision: state.pendingDecision
-    ? { ...state.pendingDecision, options: [...state.pendingDecision.options] }
+    ? ({ ...state.pendingDecision, options: [...state.pendingDecision.options] } as PendingDecision)
     : null,
   flight: state.flight ? { ...state.flight } : null,
   scramble: state.scramble ? { ...state.scramble } : null,
@@ -213,19 +234,20 @@ export const createSimulation = (config: SimulationConfig): SimulationState => {
   const routePoints = resolveRoutePoints(config.route.waypoints, alignmentX, losY);
   const receiverRuntime = createRunnerRuntime(routePoints, config.receiver.metrics);
 
+  const defense = getDefensivePlay(config.defensivePlayId);
   const quarterbackPos = { x: FIELD_CENTER_X, y: losY - QB_DROP_DEPTH_YD };
   const entities: SimEntity[] = [
     buildEntity(ENTITY_IDS.safety, "DEFENDER", DEFAULT_SAFETY.jerseyNumber, {
       x: FIELD_CENTER_X,
-      y: losY + SAFETY_DEPTH_YD,
+      y: losY + defense.safety.depthYd,
     }),
     buildEntity(ENTITY_IDS.cornerback, "DEFENDER", config.cornerback.jerseyNumber, {
       x: clamp(routePoints[0].x + inside * 0.8, 0.5, FIELD_WIDTH_YD - 0.5),
-      y: losY + 5,
+      y: losY + defense.cornerback.depthYd,
     }),
     buildEntity(ENTITY_IDS.rusher, "RUSHER", config.rusher.jerseyNumber, {
       x: FIELD_CENTER_X,
-      y: losY + RUSHER_START_DEPTH_YD,
+      y: losY + defense.rusher.startDepthYd,
     }),
     buildEntity(ENTITY_IDS.quarterback, "QB", config.quarterback.jerseyNumber, quarterbackPos),
     buildEntity(ENTITY_IDS.receiver, "RECEIVER", config.receiver.jerseyNumber, { ...routePoints[0] }),
@@ -239,6 +261,22 @@ export const createSimulation = (config: SimulationConfig): SimulationState => {
     [ENTITY_IDS.rusher]: buildAttributes(config.rusher.metrics),
   };
   const runners: Record<string, RunnerRuntime> = { [ENTITY_IDS.receiver]: receiverRuntime };
+
+  const zoneAnchors: Record<string, Vec2> = {};
+  const defenderCalls: [string, DefenderCall][] = [
+    [ENTITY_IDS.cornerback, defense.cornerback],
+    [ENTITY_IDS.safety, defense.safety],
+  ];
+  defenderCalls.forEach(([id, call]) => {
+    if (call.coverage.kind !== "ZONE") return;
+    zoneAnchors[id] = {
+      x:
+        call.coverage.anchor === "CENTER"
+          ? FIELD_CENTER_X
+          : lerp(routePoints[0].x, FIELD_CENTER_X, ZONE_ANCHOR_RECEIVER_SIDE_BLEND),
+      y: losY + call.depthYd,
+    };
+  });
 
   if (config.mode === "TACTICAL") {
     const outletX = FIELD_CENTER_X + inside * 6;
@@ -267,6 +305,7 @@ export const createSimulation = (config: SimulationConfig): SimulationState => {
     pendingDecision: null,
     outcome: null,
     attributes,
+    zoneAnchors,
     runners,
     decisionPoint: selectDecisionPoint(config),
     breakTimeSec: timeToReachArc(receiverRuntime, breakArc),
@@ -275,6 +314,9 @@ export const createSimulation = (config: SimulationConfig): SimulationState => {
     flight: null,
     scramble: null,
     lastPullAttemptSec: {},
+    defenseCall: null,
+    offenseDecisionAtSec: null,
+    offenseAction: null,
   };
 };
 
@@ -373,8 +415,19 @@ const checkQuarterbackPulls = (state: SimulationState, pullerIds: string[], reas
 
 // ---------- Passing ----------
 
-const getRusherDistanceToQuarterback = (state: SimulationState): number =>
-  distance(getEntity(state, ENTITY_IDS.rusher).pos, getEntity(state, ENTITY_IDS.quarterback).pos);
+/** The defenders who are rushing the QB: the rusher, plus the safety once the defense has sent him. */
+const getQuarterbackPullerIds = (state: SimulationState): string[] =>
+  state.defenseCall === "BLITZ_SAFETY" ? [ENTITY_IDS.rusher, ENTITY_IDS.safety] : [ENTITY_IDS.rusher];
+
+/** Distance from the closest pass rusher to the QB. */
+const getRusherDistanceToQuarterback = (state: SimulationState): number => {
+  const quarterback = getEntity(state, ENTITY_IDS.quarterback);
+  return Math.min(...getQuarterbackPullerIds(state).map((id) => distance(getEntity(state, id).pos, quarterback.pos)));
+};
+
+/** True while the cornerback is gambling on the receiver's route and the ball goes to that receiver. */
+const isGamblingOnTarget = (state: SimulationState, targetId: string): boolean =>
+  state.defenseCall === "JUMP_ROUTE" && targetId === ENTITY_IDS.receiver;
 
 const launchPass = (state: SimulationState, targetId: string): void => {
   const quarterback = getEntity(state, ENTITY_IDS.quarterback);
@@ -426,6 +479,7 @@ const evaluatePass = (state: SimulationState, flight: FlightState): PassEvaluati
     qbAccuracy: state.attributes[ENTITY_IDS.quarterback].catchProbability,
     targetCatchProbability: targetAttributes.catchProbability,
     defenderBallSkill: defenderAttributes.catchProbability,
+    interceptMultiplier: isGamblingOnTarget(state, flight.targetId) ? JUMP_ROUTE_INTERCEPT_MULTIPLIER : 1,
   });
 
   return { probabilities, metrics, nearestDefender };
@@ -470,9 +524,13 @@ const resolvePass = (state: SimulationState): void => {
     return;
   }
 
+  const gambleSeparationYd = isGamblingOnTarget(state, flight.targetId) ? JUMP_ROUTE_OVERCOMMIT_YD : 0;
+  const afterCatchSeparationYd = metrics.separationYd + gambleSeparationYd;
+  const gambleNote = gambleSeparationYd > 0 ? " The cornerback's gamble left him out of position." : "";
+
   const pullProbability = computeFlagPullProbability(
     state.attributes[nearestDefender.id].flagPullEfficiency,
-    metrics.separationYd,
+    afterCatchSeparationYd,
   );
   if (draw(state) < pullProbability) {
     const fumbled = draw(state) < FUMBLE_PROBABILITY;
@@ -482,12 +540,12 @@ const resolvePass = (state: SimulationState): void => {
       yardsGained: catchYards,
       reason: fumbled
         ? `Flag pulled by #${nearestDefender.label} right after the catch, and the ball came loose. ${context}.`
-        : `Flag pulled by #${nearestDefender.label} right after the catch. ${context}.`,
+        : `Flag pulled by #${nearestDefender.label} right after the catch. ${context}.${gambleNote}`,
     });
     return;
   }
 
-  const yardsAfterCatch = computeYardsAfterCatch(metrics.separationYd, metrics.speedDiffYps, draw(state));
+  const yardsAfterCatch = computeYardsAfterCatch(afterCatchSeparationYd, metrics.speedDiffYps, draw(state));
   const finalY = catchY + yardsAfterCatch;
   const touchdown = finalY >= GOAL_LINE_Y;
   finishPlay(state, {
@@ -495,7 +553,7 @@ const resolvePass = (state: SimulationState): void => {
     result: "COMPLETED_PASS",
     yardsGained: roundYards(Math.min(finalY, GOAL_LINE_Y) - state.config.losY),
     touchdown,
-    reason: `Completed and ran for ${roundYards(yardsAfterCatch)} yd after the catch. ${context}.`,
+    reason: `Completed and ran for ${roundYards(yardsAfterCatch)} yd after the catch. ${context}.${gambleNote}`,
   });
 };
 
@@ -518,7 +576,8 @@ const getDefenderAim = (
   }
 
   if (state.phase === "BALL_IN_FLIGHT" && state.ball && state.flight) {
-    const reactionDone = state.t - state.flight.startSec >= BALL_REACTION_SEC;
+    const ballReactionSec = isGamblingOnTarget(state, state.flight.targetId) && entity.id === ENTITY_IDS.cornerback ? 0 : BALL_REACTION_SEC;
+    const reactionDone = state.t - state.flight.startSec >= ballReactionSec;
     if (reactionDone) return { aim: state.ball.to, targetId: state.ball.targetId, holdYd: BALL_SPOT_HOLD_YD };
   }
 
@@ -531,27 +590,38 @@ const getDefenderAim = (
     };
   }
 
-  if (entity.id === ENTITY_IDS.cornerback) {
+  if (state.defenseCall === "BLITZ_SAFETY" && entity.id === ENTITY_IDS.safety) {
     return {
-      aim: computePursuitAim(entity.pos, attributes.topSpeedYps, receiver, MAN_COVERAGE_LEAD_FACTOR),
+      aim: computePursuitAim(entity.pos, attributes.topSpeedYps, quarterback, 1),
+      targetId: quarterback.id,
+      holdYd: QB_CHASE_HOLD_YD,
+    };
+  }
+
+  const { coverage } = getDefenderCall(state, entity.id);
+  if (coverage.kind === "MAN") {
+    return {
+      aim: computePursuitAim(entity.pos, attributes.topSpeedYps, receiver, coverage.leadFactor),
       targetId: receiver.id,
       holdYd: DEFENDER_HOLD_DISTANCE_YD,
     };
   }
 
-  const zoneAnchor = { x: FIELD_CENTER_X, y: state.config.losY + SAFETY_DEPTH_YD };
-  const isReceiverClose = distance(entity.pos, receiver.pos) < SAFETY_ENGAGE_DISTANCE_YD;
+  const isReceiverClose = distance(entity.pos, receiver.pos) < coverage.engageDistanceYd;
   return {
     aim: isReceiverClose
-      ? computePursuitAim(entity.pos, attributes.topSpeedYps, receiver, 0.5)
-      : computeZoneAim(zoneAnchor, receiver, SAFETY_CUSHION_YD),
+      ? computePursuitAim(entity.pos, attributes.topSpeedYps, receiver, ZONE_ENGAGE_LEAD_FACTOR)
+      : computeZoneAim(state.zoneAnchors[entity.id], receiver, coverage.cushionYd),
     targetId: receiver.id,
     holdYd: DEFENDER_HOLD_DISTANCE_YD,
   };
 };
 
 const moveDefender = (state: SimulationState, entity: SimEntity, deltaSec: number): void => {
-  const reactionSec = entity.role === "RUSHER" ? RUSHER_DELAY_SEC : DEFENDER_REACTION_SEC;
+  const reactionSec =
+    entity.role === "RUSHER"
+      ? getDefensivePlay(state.config.defensivePlayId).rusher.delaySec
+      : getDefenderCall(state, entity.id).reactionSec;
   if (state.t < reactionSec) return;
 
   const { aim, targetId, holdYd } = getDefenderAim(state, entity);
@@ -606,14 +676,24 @@ const hasReachedDecisionPoint = (state: SimulationState): boolean => {
   return (receiver.routeProgress ?? 0) * runtime.path.totalLength >= cutArc - 1e-6;
 };
 
+const buildPendingDecision = (state: SimulationState): PendingDecision =>
+  state.config.category === "DEFENSE"
+    ? { dpId: state.decisionPoint.id, category: "DEFENSE", options: [...ALL_DEFENSIVE_ACTIONS] }
+    : { dpId: state.decisionPoint.id, category: "OFFENSE", options: [...ALL_DECISIONS] };
+
 const handleRunning = (state: SimulationState): void => {
   const isTactical = state.config.mode === "TACTICAL";
 
   if (isTactical) {
-    if (checkQuarterbackPulls(state, [ENTITY_IDS.rusher], "Rusher got home and pulled the QB's flag (sack)")) return;
+    if (checkQuarterbackPulls(state, getQuarterbackPullerIds(state), "The rush got home and pulled the QB's flag (sack)")) return;
+
+    if (state.offenseDecisionAtSec !== null) {
+      if (state.t >= state.offenseDecisionAtSec) runEngineOffense(state);
+      return;
+    }
     if (hasReachedDecisionPoint(state)) {
       state.phase = "PAUSED_FOR_DECISION";
-      state.pendingDecision = { dpId: state.decisionPoint.id, options: [...ALL_DECISIONS] };
+      state.pendingDecision = buildPendingDecision(state);
       return;
     }
   }
@@ -707,42 +787,51 @@ export const stepSimulation = (state: SimulationState, deltaSec: number): Simula
   return next;
 };
 
-/** Applies the user's choice while the play is paused at a decision point. */
-export const applyDecision = (state: SimulationState, action: DecisionAction): SimulationState => {
-  if (state.phase !== "PAUSED_FOR_DECISION") return state;
-
-  const next = cloneState(state);
-  next.pendingDecision = null;
+/** Carries out an offensive call on `state` in place: a throw, a checkdown or a pump fake and scramble. */
+const performOffenseDecision = (state: SimulationState, action: DecisionAction): void => {
+  state.pendingDecision = null;
 
   if (action === "PASS_TO_WR") {
-    launchPass(next, ENTITY_IDS.receiver);
-    return next;
+    launchPass(state, ENTITY_IDS.receiver);
+    return;
   }
   if (action === "CHECKDOWN") {
-    launchPass(next, ENTITY_IDS.outlet);
-    return next;
+    launchPass(state, ENTITY_IDS.outlet);
+    return;
   }
 
-  const quarterback = getEntity(next, ENTITY_IDS.quarterback);
-  const rusher = getEntity(next, ENTITY_IDS.rusher);
-  next.scramble = {
-    startSec: next.t,
-    fakeUntilSec: next.t + PUMP_FAKE_SEC,
+  const quarterback = getEntity(state, ENTITY_IDS.quarterback);
+  const rusher = getEntity(state, ENTITY_IDS.rusher);
+  state.scramble = {
+    startSec: state.t,
+    fakeUntilSec: state.t + PUMP_FAKE_SEC,
     // Escape away from the rusher's side.
     direction: quarterback.pos.x >= rusher.pos.x ? 1 : -1,
   };
-  next.phase = "SCRAMBLING";
+  state.phase = "SCRAMBLING";
+};
+
+/** Applies the user's choice while the offense is paused at a decision point. */
+export const applyDecision = (state: SimulationState, action: DecisionAction): SimulationState => {
+  if (state.phase !== "PAUSED_FOR_DECISION" || state.pendingDecision?.category === "DEFENSE") return state;
+
+  const next = cloneState(state);
+  performOffenseDecision(next, action);
   return next;
 };
 
 /**
- * Looks ahead (on a copy) to estimate the odds of a pass or checkdown if thrown right now.
- * Returns null for non-throwing actions.
+ * Plays a throw or checkdown out on a copy of `state` (which may be paused or just running) to read
+ * the odds the ball would face. Returns null for the scramble, which has no pass odds.
  */
-export const previewDecision = (state: SimulationState, action: DecisionAction): PassPreview | null => {
-  if (action === "PUMP_FAKE_SCRAMBLE" || state.phase !== "PAUSED_FOR_DECISION") return null;
+const previewThrow = (state: SimulationState, action: DecisionAction): PassPreview | null => {
+  if (action === "PUMP_FAKE_SCRAMBLE") return null;
 
-  let lookahead = applyDecision(state, action);
+  let lookahead = cloneState(state);
+  lookahead.phase = "PAUSED_FOR_DECISION";
+  lookahead.offenseDecisionAtSec = null;
+  performOffenseDecision(lookahead, action);
+
   const targetDepthYd = roundYards((lookahead.ball?.to.y ?? state.config.losY) - state.config.losY);
   for (let iteration = 0; iteration < 300 && lookahead.phase === "BALL_IN_FLIGHT"; iteration += 1) {
     lookahead = stepSimulation(lookahead, 1 / 30);
@@ -751,6 +840,63 @@ export const previewDecision = (state: SimulationState, action: DecisionAction):
   const { outcome } = lookahead;
   if (!outcome?.probabilities || !outcome.metrics) return null;
   return { probabilities: outcome.probabilities, metrics: outcome.metrics, targetDepthYd };
+};
+
+/**
+ * Looks ahead (on a copy) to estimate the odds of a pass or checkdown if thrown right now.
+ * Returns null for non-throwing actions.
+ */
+export const previewDecision = (state: SimulationState, action: DecisionAction): PassPreview | null =>
+  state.phase === "PAUSED_FOR_DECISION" ? previewThrow(state, action) : null;
+
+/** The engine-run QB: scrambles under heavy pressure, otherwise takes the better of the pass and the checkdown. */
+const chooseEngineOffenseAction = (state: SimulationState): DecisionAction => {
+  if (getRusherDistanceToQuarterback(state) < QB_SCRAMBLE_TRIGGER_YD) return "PUMP_FAKE_SCRAMBLE";
+
+  const score = (action: DecisionAction): number => {
+    const preview = previewThrow(state, action);
+    return preview ? preview.probabilities.complete - 2 * preview.probabilities.intercept : Number.NEGATIVE_INFINITY;
+  };
+  return score("CHECKDOWN") > score("PASS_TO_WR") ? "CHECKDOWN" : "PASS_TO_WR";
+};
+
+/** The engine-run QB reads the defense's call and acts on it, in place. */
+const runEngineOffense = (state: SimulationState): void => {
+  const action = chooseEngineOffenseAction(state);
+  state.offenseAction = action;
+  state.offenseDecisionAtSec = null;
+  performOffenseDecision(state, action);
+};
+
+const scaleTopSpeed = (
+  attributes: Record<string, EntityAttributes>,
+  entityId: string,
+  multiplier: number,
+): Record<string, EntityAttributes> => ({
+  ...attributes,
+  [entityId]: { ...attributes[entityId], topSpeedYps: attributes[entityId].topSpeedYps * multiplier },
+});
+
+const DEFENSIVE_CALL_SPEED_BOOSTS: Partial<Record<DefensiveAction, { entityId: string; multiplier: number }>> = {
+  JUMP_ROUTE: { entityId: ENTITY_IDS.cornerback, multiplier: JUMP_ROUTE_SPEED_MULTIPLIER },
+  BLITZ_SAFETY: { entityId: ENTITY_IDS.rusher, multiplier: BLITZ_RUSHER_SPEED_MULTIPLIER },
+};
+
+/**
+ * Applies the user's live defensive call while the defense is paused at a decision point. The play
+ * resumes and the engine-run QB acts on the call after a short read.
+ */
+export const applyDefensiveDecision = (state: SimulationState, action: DefensiveAction): SimulationState => {
+  if (state.phase !== "PAUSED_FOR_DECISION" || state.pendingDecision?.category !== "DEFENSE") return state;
+
+  const next = cloneState(state);
+  const boost = DEFENSIVE_CALL_SPEED_BOOSTS[action];
+  next.pendingDecision = null;
+  next.defenseCall = action;
+  next.attributes = boost ? scaleTopSpeed(next.attributes, boost.entityId, boost.multiplier) : next.attributes;
+  next.offenseDecisionAtSec = next.t + QB_READ_SEC;
+  next.phase = "RUNNING";
+  return next;
 };
 
 /** Absolute route polyline for rendering the receiver's route. */

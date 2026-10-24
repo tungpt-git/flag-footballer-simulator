@@ -28,4 +28,11 @@ export const ROUTE_BLURBS: Record<RouteType, string> = {
   GO: "Straight vertical stretch. No cut, so the decision comes on the clock.",
   HOOK: "Stop and come back to the QB at 10 yards. Reliable against deep coverage.",
   POST: "Deep inside break at 10 yards toward the goalpost. High reward, high risk.",
+  DRAG: "Shallow cross over the middle at 3 yards. Easy yards against zone and a quick answer to the blitz.",
+  FLAT: "Short release to the sideline at 3 yards. The safest check-down when the rush is coming.",
+  COMEBACK: "Run to 14 yards, then break back toward the sideline. Beats corners who are playing deep.",
+  CORNER: "Stem to 10 yards, then break to the sideline corner. Stretches the safety and the zone defender.",
+  WHEEL: "Peel to the sideline, then turn upfield along it. Burns defenders who sit on the first break.",
+  FADE: "Vertical release that drifts to the sideline. No cut, so the QB throws it on the clock to a back-shoulder spot.",
+  SLUGGO: "Slant and go: sells the quick slant, then turns upfield. Punishes defenders who jump the first break.",
 };
