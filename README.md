@@ -10,15 +10,15 @@ Stack: Next.js (App Router, TypeScript), Tailwind CSS v4, shadcn/ui (restyled to
 ## Quick start
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env        # DATABASE_URL for the Docker database
-npm run db:up               # postgres:16 in Docker
-npx prisma migrate dev      # create tables
-npm run db:seed             # 34 players (replaces the roster) + 12 routes
-npm run dev                 # http://localhost:3000
+pnpm db:up                  # postgres:16 in Docker
+pnpm exec prisma migrate dev  # create tables
+pnpm db:seed                # 34 players (replaces the roster) + 12 routes
+pnpm dev                    # http://localhost:3000
 ```
 
-Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`.
+Other scripts: `pnpm test`, `pnpm typecheck`, `pnpm lint`, `pnpm build`.
 
 ## Production
 
@@ -26,12 +26,12 @@ Docker-based: a one-shot `prisma migrate deploy` job and the Next.js standalone 
 
 ```bash
 cp .env.production.example .env.production   # set the Supabase password in DATABASE_URL
-npm run prod:up                              # build, migrate, start on APP_PORT (default 3000)
-npm run prod:logs
-npm run prod:down
+pnpm prod:up                                 # build, migrate, start on APP_PORT (default 3000)
+pnpm prod:logs
+pnpm prod:down
 ```
 
-The seed is not run in production because it replaces the roster. To load the sample data once, run `DATABASE_URL=<supabase url> npm run db:seed`.
+The seed is not run in production because it replaces the roster. To load the sample data once, run `DATABASE_URL=<supabase url> pnpm db:seed`.
 
 Supabase notes: the direct host `db.<ref>.supabase.co` is IPv6-only unless the IPv4 add-on is enabled. If the host can't reach it, use the Session pooler string from the Supabase dashboard (Connect) instead.
 

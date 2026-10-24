@@ -1,6 +1,6 @@
 # Production stack (database is external: Supabase). Usage:
 #   cp .env.production.example .env.production   # then set the real password
-#   npm run prod:up
+#   pnpm prod:up
 name: flag-football-prod
 
 services:
@@ -25,3 +25,15 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+
+# Supabase's direct host is IPv6-only. Docker's default bridge is IPv4, so give
+# this stack a ULA subnet; the daemon masquerades it out through the host's IPv6.
+networks:
+  default:
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.28.210.0/24
+          gateway: 172.28.210.1
+        - subnet: fd12:3456:789a:1::/64
+          gateway: fd12:3456:789a:1::1

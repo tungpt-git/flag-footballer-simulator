@@ -6,11 +6,14 @@ RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
 # Install all dependencies (prisma CLI is a devDependency, needed for build + migrate).
+# npm only bootstraps pnpm. Node 22.15's corepack cannot launch pnpm 12 (it looks for pnpm.cjs).
 FROM base AS deps
-COPY package.json package-lock.json .npmrc ./
+RUN npm install -g pnpm@12.15.0
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-RUN npm ci
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+    pnpm install --frozen-lockfile --store-dir /pnpm/store
 
 # Build the Next.js standalone output.
 FROM deps AS builder
@@ -18,13 +21,14 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 # Placeholder so route modules can be imported during `next build`; no connection is made.
 # The real DATABASE_URL is injected at runtime and is never baked into the image.
-RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npm run build
+RUN --mount=type=cache,target=/app/.next/cache \
+    DATABASE_URL="postgresql://build:build@localhost:5432/build" pnpm run build
 
 # One-shot image that applies migrations: `prisma migrate deploy`.
 FROM deps AS migrator
 COPY prisma ./prisma
 COPY prisma.config.ts ./
-CMD ["npx", "prisma", "migrate", "deploy"]
+CMD ["pnpm", "exec", "prisma", "migrate", "deploy"]
 
 # Minimal runtime image.
 FROM base AS runner

@@ -1,0 +1,9 @@
+# pnpm 12 waits a day before installing a newly published version. This app
+# already pins those versions in the lockfile, so keep installs immediate.
+minimumReleaseAge: 0
+
+allowBuilds:
+  "@prisma/engines": true
+  esbuild: true
+  prisma: true
+  unrs-resolver: true
