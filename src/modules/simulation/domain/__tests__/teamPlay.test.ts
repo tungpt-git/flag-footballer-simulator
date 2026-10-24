@@ -107,6 +107,8 @@ describe("5-on-5 simulation", () => {
     expect(start.attributes.Z.catchProbability).toBe(0.11);
     expect(start.attributes.Y.catchProbability).toBe(DEFAULT_OUTLET.metrics.catchProbability);
     expect(start.attributes["db-X"].catchProbability).toBe(0.21);
+    expect(start.entities.find((entity) => entity.id === "db-X")?.label).toBe("1");
+    expect(start.entities.find((entity) => entity.id === "db-Y")?.label).toBe("Y");
     expect(start.attributes[ENTITY_IDS.quarterback].catchProbability).toBe(0.77);
     expect(start.attributes[ENTITY_IDS.rusher].catchProbability).toBe(0.33);
   });

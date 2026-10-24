@@ -23,5 +23,8 @@ export const getEntityProfile = (config: SimulationConfig, entityId: string): Pl
     [ENTITY_IDS.safety]: DEFAULT_SAFETY,
     [ENTITY_IDS.rusher]: config.rusher,
   };
-  return profiles[entityId] ?? null;
+  if (profiles[entityId]) return profiles[entityId];
+
+  const covered = config.teamPlay?.defenders.find((defender) => `db-${defender.runnerId}` === entityId);
+  return covered?.player ?? null;
 };

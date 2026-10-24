@@ -272,8 +272,9 @@ const createTeamSimulation = (config: SimulationConfig): SimulationState => {
     const id = `db-${runner.id}`;
     const call = coverMan || index < 2 ? defense.cornerback : defense.safety;
     const alignment = runner.points[0];
+    const defenderLabel = defender.player.id.startsWith("default_") ? runner.id : defender.player.jerseyNumber;
     entities.push(
-      buildEntity(id, "DEFENDER", runner.id, {
+      buildEntity(id, "DEFENDER", defenderLabel, {
         x: clamp(alignment.x + (index - 1.5) * 1.1, 0.5, FIELD_WIDTH_YD - 0.5),
         y: losY + call.depthYd,
       }),
