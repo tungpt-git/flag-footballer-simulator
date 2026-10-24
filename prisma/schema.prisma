@@ -28,8 +28,9 @@ enum RouteType {
 model Player {
   id           String   @id @default(cuid())
   name         String
-  position     Position
-  jerseyNumber Int      @unique
+  position     Position // main position
+  altPositions Position[] @default([]) // other positions the player can play
+  jerseyNumber Int // not unique: players may share a number
 
   // Athletic metrics
   fortyYardDash      Float // seconds

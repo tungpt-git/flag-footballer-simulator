@@ -1,6 +1,6 @@
 import { Prisma, type Player } from "@/generated/prisma/client";
 import { prisma } from "@/shared/infrastructure/prisma";
-import { JerseyNumberTakenError, PlayerNotFoundError } from "../domain/errors";
+import { PlayerNotFoundError } from "../domain/errors";
 import type { PlayerInput, PlayerProfile } from "../domain/player";
 import type { PlayerRepository } from "../domain/playerRepository";
 
@@ -9,6 +9,7 @@ const toPlayerProfile = (player: Player): PlayerProfile => ({
   id: player.id,
   name: player.name,
   position: player.position,
+  altPositions: player.altPositions,
   jerseyNumber: player.jerseyNumber,
   metrics: {
     fortyYardDash: player.fortyYardDash,
@@ -29,6 +30,7 @@ const toPlayerProfile = (player: Player): PlayerProfile => ({
 const toPlayerData = (input: PlayerInput) => ({
   name: input.name,
   position: input.position,
+  altPositions: input.altPositions,
   jerseyNumber: input.jerseyNumber,
   fortyYardDash: input.metrics.fortyYardDash,
   agility: input.metrics.agility,
@@ -43,10 +45,7 @@ const toPlayerData = (input: PlayerInput) => ({
 
 /** Translates Prisma error codes into the roster's domain errors. */
 const translateError = (error: unknown): never => {
-  if (error instanceof Prisma.PrismaClientKnownRequestError) {
-    if (error.code === "P2002") throw new JerseyNumberTakenError();
-    if (error.code === "P2025") throw new PlayerNotFoundError();
-  }
+  if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") throw new PlayerNotFoundError();
   throw error;
 };
 

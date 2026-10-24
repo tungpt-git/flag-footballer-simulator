@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { PlayerInput, PlayerProfile, Position } from "../domain/player";
+import { normalizeAltPositions, type PlayerInput, type PlayerProfile, type Position } from "../domain/player";
 import { positionSchema } from "../domain/playerSchema";
 
 const numberField = (message: string) => z.number({ error: message });
@@ -8,6 +8,7 @@ const numberField = (message: string) => z.number({ error: message });
 export const playerFormSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(60, "Name is too long"),
   position: positionSchema,
+  altPositions: z.array(positionSchema),
   jerseyNumber: numberField("Enter a jersey number").int("Whole numbers only").min(0, "Min 0").max(99, "Max 99"),
   fortyYardDash: numberField("Enter a time in seconds").min(3.8, "Min 3.8 s").max(8, "Max 8 s"),
   agility: numberField("Enter 0-100").int("Whole numbers only").min(0, "Min 0").max(100, "Max 100"),
@@ -27,6 +28,7 @@ const DEFAULT_POSITION: Position = "WR";
 export const getEmptyPlayerForm = (): PlayerFormValues => ({
   name: "",
   position: DEFAULT_POSITION,
+  altPositions: [],
   jerseyNumber: 0,
   fortyYardDash: 4.8,
   agility: 70,
@@ -42,6 +44,7 @@ export const getEmptyPlayerForm = (): PlayerFormValues => ({
 export const toFormValues = (player: PlayerProfile): PlayerFormValues => ({
   name: player.name,
   position: player.position,
+  altPositions: player.altPositions,
   jerseyNumber: player.jerseyNumber,
   fortyYardDash: player.metrics.fortyYardDash,
   agility: player.metrics.agility,
@@ -57,6 +60,7 @@ export const toFormValues = (player: PlayerProfile): PlayerFormValues => ({
 export const toPlayerInput = (values: PlayerFormValues): PlayerInput => ({
   name: values.name.trim(),
   position: values.position,
+  altPositions: normalizeAltPositions(values.position, values.altPositions),
   jerseyNumber: values.jerseyNumber,
   metrics: {
     fortyYardDash: values.fortyYardDash,

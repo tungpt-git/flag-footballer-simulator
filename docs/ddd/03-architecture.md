@@ -6,7 +6,7 @@ Applies the boundary clues from [02-discovery.md](./02-discovery.md).
 
 | Context | Type | Aggregate / model | Owns |
 | :-- | :-- | :-- | :-- |
-| `roster` | Supporting | `PlayerProfile` (aggregate root) | Player CRUD, jersey uniqueness, athletic conversions (`dashToAverageYps`) |
+| `roster` | Supporting | `PlayerProfile` (aggregate root) | Player CRUD, athletic conversions (`dashToAverageYps`) |
 | `playbook` | Supporting | `Route` (aggregate root) | Route templates, cut detection, alignment mirroring, decision points |
 | `simulation` | Core | `SimulationState` (engine state), `SimulationFrame` (snapshot) | Movement, pursuit, pass odds, outcomes, decisions, rendering, play store |
 
@@ -67,7 +67,7 @@ Next.js route files stay one-liners, for example `export const GET = playerHandl
 
 ## Errors
 
-Business-rule failures are domain errors (`PlayerNotFoundError`, `JerseyNumberTakenError`), thrown by repositories and mapped to HTTP codes (404, 409) in `shared/infrastructure/http/apiResponses.ts`. Prisma error codes never leave the infrastructure layer.
+Business-rule failures are domain errors (`PlayerNotFoundError`), thrown by repositories and mapped to HTTP codes (404, 409 for conflicts) in `shared/infrastructure/http/apiResponses.ts`. Prisma error codes never leave the infrastructure layer.
 
 ## Deliberate trade-offs
 

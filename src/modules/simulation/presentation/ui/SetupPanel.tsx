@@ -5,7 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { LabeledSelect, type SelectOption } from "@/shared/ui/primitives/labeled-select";
 import { DEFAULT_LOS_Y } from "@/shared/kernel/field";
 import { createRunnerRuntime, estimateRouteDurationSec } from "../../domain/movement";
-import { dashToMetersPerSecond, type PlayerProfile, type Position } from "@/modules/roster";
+import { canPlayPosition, dashToMetersPerSecond, type PlayerProfile, type Position } from "@/modules/roster";
 import { resolveRoutePoints } from "@/modules/playbook";
 import { RouteThumbnail } from "@/modules/playbook/ui";
 import { TRIGGER_LABELS } from "../../domain/labels";
@@ -24,7 +24,7 @@ const ALIGNMENT_OPTIONS: { value: AlignmentSide; label: string }[] = [
 
 const buildPlayerOptions = (players: PlayerProfile[], position: Position): SelectOption[] =>
   players
-    .filter((player) => player.position === position)
+    .filter((player) => canPlayPosition(player, position))
     .map((player) => ({
       value: player.id,
       label: `#${player.jerseyNumber} ${player.name} - ${player.metrics.fortyYardDash.toFixed(2)}s`,

@@ -9,7 +9,7 @@
 
 | Goals | Boundary |
 | :-- | :-- |
-| Maintain player profiles (bio, athletic metrics, season stats) | Create, edit, delete and list. One player per jersey number. |
+| Maintain player profiles (bio, athletic metrics, season stats) | Create, edit, delete and list. Jersey numbers may repeat. |
 | Maintain a catalog of named routes | Slant, Out, Go, Hook, Post, defined as offsets from the receiver's alignment. Read-only in the UI. |
 | Simulate one pass play, top-down, for one target | One receiver, one man-coverage defender, one safety, one rusher, one outlet receiver. |
 | View Only mode | Pick receiver and route, press Play, watch the run to the end of the route. |
@@ -36,7 +36,7 @@
 | Agility 0-100 maps linearly to acceleration and cut penalty | Assumption | No | Needs coach feedback on feel |
 | `catchProbability` is reused per position (catching, throw accuracy, ball skills) | Assumption | Yes | Ask coaches whether separate fields are needed |
 | Engine runs deterministically at a fixed 1/120 s step | Constraint | Yes | `simulation.test.ts` |
-| Jersey numbers are unique across the whole roster (not per position) | Assumption | Yes | Database unique index |
+| Jersey numbers may be shared by several players | Assumption | No | Players are told apart by id, not by number |
 | Outlet receiver and default defenders are synthetic, not rostered players | Assumption | Yes | `simulation/domain/constants.ts` |
 
 ## Terminology seeds
@@ -70,7 +70,6 @@
 | Integration | Simulation depends on roster and playbook shapes | Changes in either break the engine | Rename of a field | Depend on each module's published `index.ts` only; enforced by lint |
 | Integration | Client fetches roster and routes over HTTP | Simulator is unusable if the API is down | Database offline | Clear error state and retry; keep the engine free of I/O |
 | Consistency | Deleting a player who is selected in the simulator | Stale lineup | Delete while the simulator is open | The store keeps a selection only if the player still exists, otherwise it picks the first player in that position |
-| Consistency | Duplicate jersey numbers under concurrent writes | Corrupt roster | Two coaches save at once | Database unique index, mapped to a domain error and HTTP 409 |
 | Delivery | Engine tuning is subjective and has no acceptance numbers | Endless tuning | Disagreement on feel | Document sample odds in tests and freeze them as regression tests |
 | Delivery | Layer boundaries erode over time | Big-ball-of-mud returns | Shortcut imports | ESLint `no-restricted-imports` rules per module and layer |
 

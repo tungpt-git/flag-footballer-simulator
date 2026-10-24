@@ -8,7 +8,7 @@ import { Input } from "@/shared/ui/primitives/input";
 import { LabeledSelect } from "@/shared/ui/primitives/labeled-select";
 import { PositionGlyph } from "@/shared/ui/PositionGlyph";
 import { cn } from "@/shared/ui/utils";
-import { POSITIONS, type PlayerProfile, type Position } from "../../domain/player";
+import { POSITIONS, canPlayPosition, type PlayerProfile, type Position } from "../../domain/player";
 import { getMetricScores, getTeamAverageScores } from "../metricScores";
 import { usePlayers } from "../usePlayers";
 import { DeletePlayerDialog } from "./DeletePlayerDialog";
@@ -87,13 +87,13 @@ export const PlayersWorkspace = () => {
   const visiblePlayers = useMemo(() => {
     const query = search.trim().toLowerCase();
     return players
-      .filter((player) => filter === "ALL" || player.position === filter)
+      .filter((player) => filter === "ALL" || canPlayPosition(player, filter))
       .filter((player) => query === "" || player.name.toLowerCase().includes(query) || String(player.jerseyNumber) === query)
       .sort(SORTERS[sortKey]);
   }, [players, filter, search, sortKey]);
 
   const countFor = (positionFilter: PositionFilter): number =>
-    positionFilter === "ALL" ? players.length : players.filter((player) => player.position === positionFilter).length;
+    positionFilter === "ALL" ? players.length : players.filter((player) => canPlayPosition(player, positionFilter)).length;
 
   const handleCreate = (): void => {
     setEditingPlayer(null);

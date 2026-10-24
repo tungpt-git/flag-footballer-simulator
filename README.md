@@ -14,7 +14,7 @@ npm install
 cp .env.example .env        # DATABASE_URL for the Docker database
 npm run db:up               # postgres:16 in Docker
 npx prisma migrate dev      # create tables
-npm run db:seed             # 11 players + 5 routes
+npm run db:seed             # 34 players (replaces the roster) + 5 routes
 npm run dev                 # http://localhost:3000
 ```
 
@@ -68,13 +68,14 @@ Field units are yards. `x` is lateral (0 to 30), `y` is downfield: 0 is midfield
   "id": "p_wr1",
   "name": "Jordan Reyes",
   "position": "WR",
+  "altPositions": ["DB"],
   "jerseyNumber": 11,
   "metrics": { "fortyYardDash": 4.55, "agility": 84, "catchProbability": 0.8, "flagPullEfficiency": 0.35 },
   "stats": { "targets": 48, "receptions": 36, "yards": 512, "flagPulls": 2, "interceptions": 0 }
 }
 ```
 
-`position` is `QB | WR | DB | RUSHER`. `catchProbability` means catching (WR), throw accuracy (QB) or ball skills (DB).
+`position` is the player's main position (`QB | WR | DB | RUSHER`). `altPositions` lists the other positions the player can play (never the main one); the simulator and playbook offer a player for every position they can play. `catchProbability` means catching (WR), throw accuracy (QB) or ball skills (DB).
 
 **Route**
 

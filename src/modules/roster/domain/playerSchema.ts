@@ -18,14 +18,31 @@ export const playerStatsSchema = z.object({
   interceptions: z.number().int().min(0),
 });
 
-export const playerInputSchema = z.object({
+const playerFieldsSchema = z.object({
   name: z.string().trim().min(2, "Name must be at least 2 characters").max(60),
   position: positionSchema,
+  altPositions: z.array(positionSchema),
   jerseyNumber: z.number().int().min(0).max(99),
   metrics: playerMetricsSchema,
   stats: playerStatsSchema,
 });
 
-export const playerProfileSchema = playerInputSchema.extend({ id: z.string().min(1) });
+type PlayerFields = z.infer<typeof playerFieldsSchema>;
+
+/** The main position is not an alternative, and an alternative is listed once. */
+const refineAltPositions = (player: PlayerFields, context: z.RefinementCtx): void => {
+  const hasMainPosition = player.altPositions.includes(player.position);
+  const hasDuplicate = new Set(player.altPositions).size !== player.altPositions.length;
+  if (!hasMainPosition && !hasDuplicate) return;
+  context.addIssue({
+    code: "custom",
+    path: ["altPositions"],
+    message: "Alternative positions must be unique and different from the main position",
+  });
+};
+
+export const playerInputSchema = playerFieldsSchema.superRefine(refineAltPositions);
+
+export const playerProfileSchema = playerFieldsSchema.extend({ id: z.string().min(1) }).superRefine(refineAltPositions);
 
 export type PlayerInputValues = z.infer<typeof playerInputSchema>;

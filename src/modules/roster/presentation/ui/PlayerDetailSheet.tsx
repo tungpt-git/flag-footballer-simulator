@@ -9,7 +9,7 @@ import { getMetricScores, type MetricScores } from "../metricScores";
 import { getPerformanceStats } from "../performance";
 import { PlayerMeters } from "./PlayerMeters";
 import { PlayerRadar } from "./PlayerRadar";
-import { PositionBadge } from "./PositionBadge";
+import { PlayerPositions } from "./PlayerPositions";
 
 type PlayerDetailSheetProps = {
   player: PlayerProfile | null;
@@ -54,9 +54,9 @@ export const PlayerDetailSheet = ({ player, teamAverage, onClose, onEdit, onDele
                 <div className="min-w-0 pb-1">
                   <DialogTitle className="truncate text-title font-semibold">{player.name}</DialogTitle>
                   <DialogDescription className="sr-only">
-                    {`${POSITION_THEME[player.position].label}, jersey ${player.jerseyNumber}. Profile with athletic metrics compared to the team average.`}
+                    {`${POSITION_THEME[player.position].label}${player.altPositions.length > 0 ? `, also plays ${player.altPositions.join(", ")}` : ""}, jersey ${player.jerseyNumber}. Profile with athletic metrics compared to the team average.`}
                   </DialogDescription>
-                  <PositionBadge position={player.position} showName className="mt-1.5" />
+                  <PlayerPositions player={player} showName className="mt-1.5" />
                 </div>
               </div>
             </header>

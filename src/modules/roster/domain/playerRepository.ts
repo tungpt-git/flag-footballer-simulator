@@ -2,7 +2,7 @@ import type { PlayerInput, PlayerProfile } from "./player";
 
 /**
  * Persistence port for the Player aggregate.
- * Implementations throw `JerseyNumberTakenError` and `PlayerNotFoundError` for rule violations.
+ * Implementations throw `PlayerNotFoundError` when the player does not exist.
  */
 export type PlayerRepository = {
   findAll: () => Promise<PlayerProfile[]>;

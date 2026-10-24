@@ -7,7 +7,7 @@ import { buttonVariants } from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/ui/utils";
 import { useRoutes } from "@/modules/playbook/ui";
 import { PositionBadge, usePlayers } from "@/modules/roster/ui";
-import { dashToMetersPerSecond } from "@/modules/roster";
+import { canPlayPosition, dashToMetersPerSecond } from "@/modules/roster";
 import { SessionSummary, useLaunchSimulator } from "@/modules/simulation/ui";
 
 type SimulationMode = Parameters<ReturnType<typeof useLaunchSimulator>>[0];
@@ -72,7 +72,7 @@ export const DashboardOverview = () => {
   const byDashTime = (first: (typeof players)[number], second: (typeof players)[number]): number =>
     first.metrics.fortyYardDash - second.metrics.fortyYardDash;
   const fastest = [...players].sort(byDashTime)[0];
-  const receivers = players.filter((player) => player.position === "WR");
+  const receivers = players.filter((player) => canPlayPosition(player, "WR"));
   const topReceivers = [...receivers].sort(byDashTime).slice(0, 5);
 
   return (

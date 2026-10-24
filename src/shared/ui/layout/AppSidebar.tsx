@@ -1,9 +1,16 @@
 "use client";
 
+import { cn } from "@/shared/ui/utils";
+import {
+  ChartColumn,
+  LayoutDashboard,
+  PlayCircle,
+  Route as RouteIcon,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { ChartColumn, LayoutDashboard, PlayCircle, Route as RouteIcon, Users, type LucideIcon } from "lucide-react";
-import { cn } from "@/shared/ui/utils";
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
 
@@ -16,7 +23,9 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 const isActiveRoute = (pathname: string, href: string): boolean =>
-  href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+  href === "/"
+    ? pathname === "/"
+    : pathname === href || pathname.startsWith(`${href}/`);
 
 /** Tablet: icon rail with captions. Desktop (xl): full sidebar. Hidden on phones (see MobileTabBar). */
 export const AppSidebar = () => {
@@ -47,14 +56,19 @@ export const AppSidebar = () => {
                     isActive && "opacity-100",
                   )}
                 />
-                <Icon className={cn("size-5 shrink-0", isActive && "text-primary")} aria-hidden="true" />
+                <Icon
+                  className={cn("size-5 shrink-0", isActive && "text-primary")}
+                  aria-hidden="true"
+                />
                 <span>{label}</span>
               </Link>
             </li>
           );
         })}
       </ul>
-      <p className="hidden px-5 pb-4 text-xs text-muted-foreground xl:block">Season 2026 · Film room</p>
+      <p className="hidden px-5 pb-4 text-xs text-muted-foreground xl:block">
+        Season 2026 · Film room
+      </p>
     </nav>
   );
 };
@@ -81,7 +95,10 @@ export const MobileTabBar = () => {
                   isActive && "text-foreground",
                 )}
               >
-                <Icon className={cn("size-5", isActive && "text-primary")} aria-hidden="true" />
+                <Icon
+                  className={cn("size-5", isActive && "text-primary")}
+                  aria-hidden="true"
+                />
                 {label}
               </Link>
             </li>

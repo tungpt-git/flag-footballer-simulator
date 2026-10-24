@@ -24,6 +24,7 @@ const buildReceiver = (fortyYardDash: number, agility = 80): PlayerProfile => ({
   id: "wr",
   name: "Test WR",
   position: "WR",
+  altPositions: [],
   jerseyNumber: 11,
   metrics: { fortyYardDash, agility, catchProbability: 0.8, flagPullEfficiency: 0.3 },
   stats: { targets: 0, receptions: 0, yards: 0, flagPulls: 0, interceptions: 0 },

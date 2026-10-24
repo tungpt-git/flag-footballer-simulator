@@ -7,7 +7,7 @@ import type {
   FieldViewMode,
 } from "../domain/types";
 import type { DecisionTrigger, Route } from "@/modules/playbook";
-import type { PlayerProfile } from "@/modules/roster";
+import { canPlayPosition, type PlayerProfile } from "@/modules/roster";
 import { DEFAULT_CORNERBACK, DEFAULT_QUARTERBACK, DEFAULT_RUSHER } from "../domain/constants";
 import { DEFAULT_LOS_Y, FIELD_WIDTH_YD } from "@/shared/kernel/field";
 import { createSeed } from "../domain/rng";
@@ -86,7 +86,7 @@ const findPlayer = (players: PlayerProfile[], id: string | null): PlayerProfile 
   players.find((player) => player.id === id);
 
 const pickFirstOfPosition = (players: PlayerProfile[], position: PlayerProfile["position"]): string | null =>
-  players.find((player) => player.position === position)?.id ?? null;
+  (players.find((player) => player.position === position) ?? players.find((player) => canPlayPosition(player, position)))?.id ?? null;
 
 export const getAlignmentX = (side: AlignmentSide): number =>
   side === "LEFT" ? LEFT_ALIGNMENT_X : RIGHT_ALIGNMENT_X;

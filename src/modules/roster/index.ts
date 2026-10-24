@@ -3,5 +3,5 @@
  * Safe to import from the server, the client and tests.
  */
 export type { PlayerInput, PlayerMetrics, PlayerProfile, PlayerStats, Position } from "./domain/player";
-export { POSITIONS } from "./domain/player";
+export { POSITIONS, canPlayPosition, getPlayablePositions } from "./domain/player";
 export { DASH_DISTANCE_YD, YARDS_TO_METERS, dashToAverageYps, dashToMetersPerSecond } from "./domain/athletics";

@@ -37,7 +37,7 @@ const buildDefaultProfile = (
   position: Position,
   jerseyNumber: number,
   metrics: PlayerProfile["metrics"],
-): PlayerProfile => ({ id, name, position, jerseyNumber, metrics, stats: emptyStats });
+): PlayerProfile => ({ id, name, position, altPositions: [], jerseyNumber, metrics, stats: emptyStats });
 
 export const DEFAULT_QUARTERBACK = buildDefaultProfile("default_qb", "Default QB", "QB", 1, {
   fortyYardDash: 5.0,

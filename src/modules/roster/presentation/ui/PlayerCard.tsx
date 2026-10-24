@@ -7,7 +7,7 @@ import type { PlayerProfile } from "../../domain/player";
 import type { MetricScores } from "../metricScores";
 import { getPerformanceSummary } from "../performance";
 import { PlayerMeters } from "./PlayerMeters";
-import { PositionBadge } from "./PositionBadge";
+import { PlayerPositions } from "./PlayerPositions";
 
 type PlayerCardProps = {
   player: PlayerProfile;
@@ -42,7 +42,7 @@ export const PlayerCard = ({ player, teamAverage, onOpen, onEdit, onDelete }: Pl
           </span>
           <div className="min-w-0">
             <h3 className="truncate text-heading font-semibold text-foreground">{player.name}</h3>
-            <PositionBadge position={player.position} showName className="mt-1" />
+            <PlayerPositions player={player} showName className="mt-1" />
           </div>
         </div>
         <div className="pointer-events-auto relative z-10 -mr-1 flex gap-0.5">

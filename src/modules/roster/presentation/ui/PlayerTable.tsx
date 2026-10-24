@@ -8,7 +8,7 @@ import { dashToMetersPerSecond } from "../../domain/athletics";
 import type { PlayerProfile } from "../../domain/player";
 import { getMetricScores } from "../metricScores";
 import { getPerformanceSummary } from "../performance";
-import { PositionBadge } from "./PositionBadge";
+import { PlayerPositions } from "./PlayerPositions";
 
 type PlayerTableProps = {
   players: PlayerProfile[];
@@ -75,7 +75,7 @@ export const PlayerTable = ({ players, onOpen, onEdit, onDelete }: PlayerTablePr
                   </button>
                 </TableCell>
                 <TableCell>
-                  <PositionBadge position={player.position} />
+                  <PlayerPositions player={player} />
                 </TableCell>
                 <TableCell>
                   <MiniMeter label={`Speed of ${player.name}`} score={scores.speed} display={`${player.metrics.fortyYardDash.toFixed(2)}s`} />

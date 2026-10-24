@@ -22,8 +22,9 @@ import { PositionGlyph } from "@/shared/ui/PositionGlyph";
 import { StatMeter } from "@/shared/ui/StatMeter";
 import { createPlayer, updatePlayer } from "../../infrastructure/playerApiClient";
 import { dashToMetersPerSecond } from "../../domain/athletics";
-import { POSITIONS, type PlayerProfile, type Position } from "../../domain/player";
+import { POSITIONS, normalizeAltPositions, type PlayerProfile, type Position } from "../../domain/player";
 import { POSITION_LABELS, getMetricLabels } from "../labels";
+import { AltPositionPicker } from "./AltPositionPicker";
 import { dashToScore, type MetricScores } from "../metricScores";
 import {
   PlayerFormValues,
@@ -70,6 +71,8 @@ const PlayerForm = ({ player, onClose, onSaved, teamAverage }: PlayerFormProps) 
   const {
     register,
     control,
+    setValue,
+    getValues,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<PlayerFormValues>({
@@ -100,6 +103,13 @@ const PlayerForm = ({ player, onClose, onSaved, teamAverage }: PlayerFormProps) 
   });
 
   const handleCancel = (): void => onClose();
+
+  /** Switching the main position removes it from the alternatives, so it is never listed twice. */
+  const handleMainPositionChange = (onFieldChange: (value: Position) => void) => (value: string): void => {
+    if (!isPosition(value)) return;
+    onFieldChange(value);
+    setValue("altPositions", normalizeAltPositions(value, getValues("altPositions")));
+  };
 
   const errorFor = (name: keyof PlayerFormValues): string | undefined => errors[name]?.message;
 
@@ -147,12 +157,19 @@ const PlayerForm = ({ player, onClose, onSaved, teamAverage }: PlayerFormProps) 
               render={({ field }) => (
                 <LabeledSelect
                   id="player-position"
-                  label="Position"
+                  label="Main position"
                   value={field.value}
                   options={POSITION_OPTIONS}
-                  onChange={(value) => isPosition(value) && field.onChange(value)}
+                  onChange={handleMainPositionChange(field.onChange)}
                 />
               )}
+            />
+          </div>
+          <div className="sm:col-span-6">
+            <Controller
+              control={control}
+              name="altPositions"
+              render={({ field }) => <AltPositionPicker mainPosition={position} value={field.value} onChange={field.onChange} />}
             />
           </div>
         </fieldset>

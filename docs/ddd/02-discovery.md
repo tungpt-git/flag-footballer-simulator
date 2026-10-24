@@ -52,8 +52,8 @@ Events are derived from the engine (`simulation/domain/simulation.ts`) and the r
 
 | Event | Command | Initiator | Exceptions |
 | :-- | :-- | :-- | :-- |
-| PlayerRegistered | RegisterPlayer | Coach | JerseyNumberRejected (409), ValidationFailed (400) |
-| PlayerProfileUpdated | UpdatePlayer | Coach | PlayerNotFound (404), JerseyNumberRejected (409) |
+| PlayerRegistered | RegisterPlayer | Coach | ValidationFailed (400) |
+| PlayerProfileUpdated | UpdatePlayer | Coach | PlayerNotFound (404), ValidationFailed (400) |
 | PlayerRemoved | RemovePlayer | Coach | PlayerNotFound (404) |
 | RoutesSeeded | (seed script) | Engineer | |
 
@@ -61,7 +61,7 @@ Events are derived from the engine (`simulation/domain/simulation.ts`) and the r
 
 | Command | Initiator | Expected result | Idempotency |
 | :-- | :-- | :-- | :-- |
-| RegisterPlayer | Coach | New player with a unique jersey number | No, repeats are rejected by uniqueness |
+| RegisterPlayer | Coach | New player (jersey number may repeat) | No, each call creates a new player |
 | UpdatePlayer | Coach | Player replaced with new values | Yes |
 | RemovePlayer | Coach | Player deleted | Not idempotent, second call is 404 |
 | ListPlayers / ListRoutes | Coach, Simulator | Current catalog | Yes |
@@ -86,7 +86,7 @@ Domain events are not yet modeled as objects. The simulation store writes them a
 
 ## Hotspots
 
-- **Consistency:** jersey number uniqueness (database index); determinism of a play (seeded RNG, fixed step, state never mutated).
+- **Consistency:** determinism of a play (seeded RNG, fixed step, state never mutated).
 - **Integration:** Simulation consumes `PlayerProfile` and `Route`; the API is the only runtime link between the contexts.
 - **Performance:** the canvas loop at 60 fps and the 120 Hz fixed step; the preview runs the engine on a clone.
 - **Compliance:** none identified (no personal data beyond names and jersey numbers; no authentication yet).
@@ -107,7 +107,7 @@ Domain events are not yet modeled as objects. The simulation store writes them a
 
 Three capabilities cluster around distinct vocabulary and rates of change:
 
-1. **Roster** (supporting): Player, Position, Metrics, Stats, jersey number. Simple CRUD, one aggregate, one invariant that crosses rows (unique jersey).
+1. **Roster** (supporting): Player, Position, Metrics, Stats, jersey number. Simple CRUD, one aggregate, no invariant that crosses rows.
 2. **Playbook** (supporting): Route, Waypoint, Cut, Decision point, alignment mirroring. Read-mostly, pure geometry on offsets.
 3. **Simulation** (core): Play, Frame, Separation, Pressure, Timing, Outcome, Decision. All the modeling effort and the tuning live here.
 
