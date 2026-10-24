@@ -49,7 +49,7 @@ export const RouteThumbnail = ({ route, className }: RouteThumbnailProps) => {
       {route.waypoints.map((waypoint, index) =>
         waypoint.cut ? (
           <g key={index} transform={`translate(${toX(waypoint.x)} ${toY(waypoint.y)}) rotate(45)`}>
-            <rect x="-0.7" y="-0.7" width="1.4" height="1.4" className="fill-warning" stroke="#0a0e13" strokeWidth="0.15" />
+            <rect x="-0.7" y="-0.7" width="1.4" height="1.4" className="fill-warning" stroke="#1a0808" strokeWidth="0.15" />
           </g>
         ) : null,
       )}

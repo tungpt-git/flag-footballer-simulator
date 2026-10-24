@@ -3,11 +3,11 @@ import Link from "next/link";
 import { ThemeToggle } from "@/shared/ui/ThemeToggle";
 
 const LogoMark = () => (
-  <svg viewBox="0 0 32 32" className="size-8" aria-hidden="true">
-    <rect width="32" height="32" rx="8" className="fill-primary" />
-    <path d="M7 22 C 12 22, 14 12, 25 9" fill="none" stroke="#0a1004" strokeWidth="2.4" strokeLinecap="round" />
-    <path d="M21.5 6.8 L26.2 8.7 L22.6 12.4 Z" fill="#0a1004" />
-    <circle cx="7" cy="22" r="2.6" fill="#0a1004" />
+  <svg viewBox="84 207 1531 492" className="h-7 w-auto fill-primary" aria-hidden="true">
+    <path d="M 709,687 1172,687 1300,559 864,559 852,561 824,571 797,590 Z" />
+    <path d="M 1465,390 1057,393 798,393 758,394 722,401 693,414 667,433 429,688 653,689 791,533 814,512 838,502 850,500 1352,499 Z" />
+    <path d="M 824,217 549,216 532,220 512,229 500,237 487,249 460,282 270,499 92,690 386,690 602,458 719,328 798,237 811,225 Z" />
+    <path d="M 739,348 1479,345 1606,216 888,215 863,222 848,230 835,240 Z" />
   </svg>
 );
 

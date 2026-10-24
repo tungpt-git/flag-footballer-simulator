@@ -12,29 +12,29 @@ export const CANVAS_COLORS = {
   line: "rgba(255,255,255,0.92)",
   lineSoft: "rgba(255,255,255,0.5)",
   yardNumber: "rgba(255,255,255,0.8)",
-  scrimmage: "#38bdf8",
+  scrimmage: "#ffd1d1",
   toGain: "#ffc233",
 
-  ink: "#0a0e13",
+  ink: "#1a0808",
   white: "#ffffff",
   offenseRing: "#ffffff",
-  defenseRing: "#0a0e13",
+  defenseRing: "#1a0808",
 
   routeGhost: "rgba(255,255,255,0.42)",
   routeActive: "#ffffff",
   routeOutlet: "rgba(255,255,255,0.5)",
   cut: "#ffc233",
 
-  pursuit: "#ff6b3d",
+  pursuit: "#ff8a5c",
   pursuitDanger: "#ff4d4d",
   throwLine: "#ffc233",
   ball: "#a8582a",
   ballLace: "#ffffff",
 
   labelText: "#ffffff",
-  labelBackground: "rgba(6,9,13,0.84)",
+  labelBackground: "rgba(16,5,5,0.84)",
   decisionRing: "#ffc233",
-  dim: "rgba(3,6,10,0.66)",
+  dim: "rgba(10,3,3,0.66)",
   selection: "#ffffff",
 } as const;
 

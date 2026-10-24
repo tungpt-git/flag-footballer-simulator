@@ -19,13 +19,13 @@ export type PositionTheme = {
 
 export const POSITION_THEME: Record<PositionKey, PositionTheme> = {
   QB: { label: "Quarterback", side: "Offense", shape: "circle", hex: "#f2b705", cssVar: "var(--pos-qb)" },
-  WR: { label: "Wide receiver", side: "Offense", shape: "diamond", hex: "#38bdf8", cssVar: "var(--pos-wr)" },
-  DB: { label: "Defensive back", side: "Defense", shape: "square", hex: "#ff6b3d", cssVar: "var(--pos-db)" },
-  RUSHER: { label: "Rusher", side: "Defense", shape: "hexagon", hex: "#d946ef", cssVar: "var(--pos-rusher)" },
+  WR: { label: "Wide receiver", side: "Offense", shape: "diamond", hex: "#a8999a", cssVar: "var(--pos-wr)" },
+  DB: { label: "Defensive back", side: "Defense", shape: "square", hex: "#ef4444", cssVar: "var(--pos-db)" },
+  RUSHER: { label: "Rusher", side: "Defense", shape: "hexagon", hex: "#ff7a9c", cssVar: "var(--pos-rusher)" },
 };
 
 /** Text colour that stays readable on top of any position hue. */
-export const POSITION_INK = "#0a0e13";
+export const POSITION_INK = "#1a0808";
 
 export const POSITION_KEYS = Object.keys(POSITION_THEME) as PositionKey[];
 

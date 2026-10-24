@@ -174,106 +174,106 @@
   }
 }
 
-/* ============ Light theme: "Clean light coaching board" ============ */
+/* ============ Light theme: "Clean light coaching board" (red accent, warm neutrals) ============ */
 :root {
   --radius: 0.625rem;
 
-  --background: #f3f5f8;
-  --foreground: #0e1726;
+  --background: #fbf3f3;
+  --foreground: #2a0d0d;
   --surface: #ffffff;
   --raised: #ffffff;
-  --stage: #dde4ed;
+  --stage: #f0d9d9;
   --card: #ffffff;
-  --card-foreground: #0e1726;
+  --card-foreground: #2a0d0d;
   --popover: #ffffff;
-  --popover-foreground: #0e1726;
-  --primary: #166534;
+  --popover-foreground: #2a0d0d;
+  --primary: #f20d0d;
   --primary-foreground: #ffffff;
-  --secondary: #e8edf3;
-  --secondary-foreground: #0e1726;
-  --muted: #eceff4;
-  --muted-foreground: #475569;
-  --accent: #e3e9f1;
-  --accent-foreground: #0e1726;
-  --border: #d3dae4;
-  --input: #8392a7;
-  --ring: #1d6fd8;
+  --secondary: #f6e4e4;
+  --secondary-foreground: #2a0d0d;
+  --muted: #f5e9e9;
+  --muted-foreground: #6b4646;
+  --accent: #f8dede;
+  --accent-foreground: #2a0d0d;
+  --border: #e6caca;
+  --input: #9a7070;
+  --ring: #f20d0d;
 
   --success: #047857;
   --success-soft: #dcf5ea;
   --warning: #92400e;
   --warning-soft: #fdf0cf;
-  --danger: #b91c1c;
-  --danger-soft: #fde4e4;
-  --info: #0b5fa5;
-  --info-soft: #dcecfb;
+  --danger: #be123c;
+  --danger-soft: #fde2e8;
+  --info: #7a3b3b;
+  --info-soft: #f6e1e1;
 
-  --mode-view: #0b6bb8;
-  --mode-live: #b45309;
+  --mode-view: #7a3b3b;
+  --mode-live: #f20d0d;
 
-  --team-offense: #0b6bb8;
-  --team-defense: #c2410c;
+  --team-offense: #44403c;
+  --team-defense: #b91c1c;
   --pos-qb: #f2b705;
-  --pos-wr: #38bdf8;
-  --pos-db: #ff6b3d;
-  --pos-rusher: #d946ef;
+  --pos-wr: #a8999a;
+  --pos-db: #ef4444;
+  --pos-rusher: #ff7a9c;
 
   --sidebar: #ffffff;
-  --sidebar-foreground: #0e1726;
-  --sidebar-primary: #166534;
+  --sidebar-foreground: #2a0d0d;
+  --sidebar-primary: #f20d0d;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e8edf3;
-  --sidebar-accent-foreground: #0e1726;
-  --sidebar-border: #d3dae4;
-  --sidebar-ring: #1d6fd8;
+  --sidebar-accent: #f6e4e4;
+  --sidebar-accent-foreground: #2a0d0d;
+  --sidebar-border: #e6caca;
+  --sidebar-ring: #f20d0d;
 }
 
-/* ============ Dark theme: "Dark broadcast / analytics" (default) ============ */
+/* ============ Dark theme: "Dark broadcast / analytics" (default; red accent, warm neutrals) ============ */
 .dark {
-  --background: #090d12;
-  --foreground: #e7edf5;
-  --surface: #0f151d;
-  --raised: #172030;
-  --stage: #05080b;
-  --card: #0f151d;
-  --card-foreground: #e7edf5;
-  --popover: #172030;
-  --popover-foreground: #e7edf5;
-  --primary: #b6f23a;
-  --primary-foreground: #0a1004;
-  --secondary: #1a2535;
-  --secondary-foreground: #e7edf5;
-  --muted: #131b26;
-  --muted-foreground: #9db0c6;
-  --accent: #1f2c40;
-  --accent-foreground: #e7edf5;
-  --border: #223044;
-  --input: #3a4c66;
-  --ring: #7cc4ff;
+  --background: #0d0707;
+  --foreground: #fbeeee;
+  --surface: #150c0c;
+  --raised: #221313;
+  --stage: #070303;
+  --card: #150c0c;
+  --card-foreground: #fbeeee;
+  --popover: #221313;
+  --popover-foreground: #fbeeee;
+  --primary: #f20d0d;
+  --primary-foreground: #ffffff;
+  --secondary: #2a1717;
+  --secondary-foreground: #fbeeee;
+  --muted: #1b1010;
+  --muted-foreground: #c9a6a6;
+  --accent: #351c1c;
+  --accent-foreground: #fbeeee;
+  --border: #3a2121;
+  --input: #5e3a3a;
+  --ring: #fca5a5;
 
   --success: #3fd68f;
   --success-soft: rgb(63 214 143 / 0.14);
   --warning: #ffc233;
   --warning-soft: rgb(255 194 51 / 0.14);
-  --danger: #ff6b6b;
-  --danger-soft: rgb(255 107 107 / 0.15);
-  --info: #5eb8ff;
-  --info-soft: rgb(94 184 255 / 0.14);
+  --danger: #ff6b8a;
+  --danger-soft: rgb(255 107 138 / 0.15);
+  --info: #f0b8b8;
+  --info-soft: rgb(240 184 184 / 0.14);
 
-  --mode-view: #5eb8ff;
-  --mode-live: #ffc233;
+  --mode-view: #f0b8b8;
+  --mode-live: #ff6b6b;
 
-  --team-offense: #38bdf8;
-  --team-defense: #ff7a4d;
+  --team-offense: #f3e6e6;
+  --team-defense: #ff5a4d;
 
-  --sidebar: #0c1218;
-  --sidebar-foreground: #e7edf5;
-  --sidebar-primary: #b6f23a;
-  --sidebar-primary-foreground: #0a1004;
-  --sidebar-accent: #1a2535;
-  --sidebar-accent-foreground: #e7edf5;
-  --sidebar-border: #1c2838;
-  --sidebar-ring: #7cc4ff;
+  --sidebar: #100808;
+  --sidebar-foreground: #fbeeee;
+  --sidebar-primary: #f20d0d;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #2a1717;
+  --sidebar-accent-foreground: #fbeeee;
+  --sidebar-border: #2e1a1a;
+  --sidebar-ring: #fca5a5;
 }
 
 @layer base {
