@@ -22,16 +22,18 @@ Other scripts: `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`.
 
 ## Production
 
-Docker-based: Postgres 16, a one-shot `prisma migrate deploy` job, and the Next.js standalone server, all in `docker-compose.prod.yml` (separate project `flag-football-prod`, so it never touches the dev database).
+Docker-based: a one-shot `prisma migrate deploy` job and the Next.js standalone server, in `docker-compose.prod.yml` (separate project `flag-football-prod`, so it never touches the dev database). The database is hosted on Supabase.
 
 ```bash
-cp .env.production.example .env.production   # set a strong POSTGRES_PASSWORD
+cp .env.production.example .env.production   # set the Supabase password in DATABASE_URL
 npm run prod:up                              # build, migrate, start on APP_PORT (default 3000)
 npm run prod:logs
-npm run prod:down                            # stop; data stays in the flag_football_pgdata_prod volume
+npm run prod:down
 ```
 
-The seed is not run in production because it replaces the roster. To load the sample data once, run `npm run db:seed` with `DATABASE_URL` pointing at the production database.
+The seed is not run in production because it replaces the roster. To load the sample data once, run `DATABASE_URL=<supabase url> npm run db:seed`.
+
+Supabase notes: the direct host `db.<ref>.supabase.co` is IPv6-only unless the IPv4 add-on is enabled. If the host can't reach it, use the Session pooler string from the Supabase dashboard (Connect) instead.
 
 ## Project structure
 
