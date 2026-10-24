@@ -1,0 +1,64 @@
+// Flag football simulator data model.
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Position {
+  QB
+  WR
+  DB
+  RUSHER
+}
+
+enum RouteType {
+  SLANT
+  OUT
+  GO
+  HOOK
+  POST
+}
+
+model Player {
+  id           String   @id @default(cuid())
+  name         String
+  position     Position
+  jerseyNumber Int      @unique
+
+  // Athletic metrics
+  fortyYardDash      Float // seconds
+  agility            Int // 0-100
+  catchProbability   Float // 0-1 (QB: throw accuracy, DB: ball skills)
+  flagPullEfficiency Float // 0-1
+
+  // Season stats
+  targets       Int @default(0)
+  receptions    Int @default(0)
+  yards         Int @default(0)
+  flagPulls     Int @default(0)
+  interceptions Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([position])
+}
+
+model Route {
+  id             String    @id @default(cuid())
+  name           String
+  type           RouteType @unique
+  // RouteWaypoint[] - offsets in yards relative to the player's alignment
+  waypoints      Json
+  // DecisionPoint[] - tactical pause triggers
+  decisionPoints Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

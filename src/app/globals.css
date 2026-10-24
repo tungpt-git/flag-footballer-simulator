@@ -1,26 +1,332 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+@custom-variant dark (&:is(.dark *));
 
+/*
+ * Design tokens - "Dark broadcast / analytics" direction (default), with a "Clean light coaching board" theme.
+ *
+ * Tailwind v4 is CSS-first, so the token map lives here (the equivalent of tailwind.config.ts `theme.extend`):
+ *   1. `:root` / `.dark` hold the raw per-theme values (CSS variables).
+ *   2. `@theme inline` maps them to Tailwind utilities (`bg-surface`, `text-success`, `bg-pos-wr`, `font-display`...).
+ *
+ * Contrast: every text/background pairing below is >= 4.5:1 (WCAG AA); UI boundaries are >= 3:1.
+ * Position hues follow the Okabe-Ito colour-blind-safe family and are always paired with a distinct shape.
+ * Keep the POSITION hex values in sync with src/shared/ui/positionTheme.ts (canvas cannot read CSS variables).
+ */
 @theme inline {
+  /* ---------- Typography ---------- */
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-display: var(--font-barlow), "Arial Narrow", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-heading: var(--font-sans);
+
+  --text-display: 3rem;
+  --text-display--line-height: 1;
+  --text-display--letter-spacing: -0.01em;
+  --text-title: 1.5rem;
+  --text-title--line-height: 1.15;
+  --text-heading: 1.0625rem;
+  --text-heading--line-height: 1.3;
+  --text-stat: 1.75rem;
+  --text-stat--line-height: 1;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1rem;
+  --text-caption--letter-spacing: 0.08em;
+
+  /* ---------- Surfaces & text ---------- */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --color-surface: var(--surface);
+  --color-raised: var(--raised);
+  --color-stage: var(--stage);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  /* ---------- Semantic status ---------- */
+  --color-destructive: var(--danger);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+
+  /* ---------- Modes (identity colours used by the switcher, stage frame and badges) ---------- */
+  --color-mode-view: var(--mode-view);
+  --color-mode-live: var(--mode-live);
+
+  /* ---------- Teams & positions ---------- */
+  --color-team-offense: var(--team-offense);
+  --color-team-defense: var(--team-defense);
+  --color-pos-qb: var(--pos-qb);
+  --color-pos-wr: var(--pos-wr);
+  --color-pos-db: var(--pos-db);
+  --color-pos-rusher: var(--pos-rusher);
+
+  /* ---------- Field greens (constant in both themes: the field is the hero) ---------- */
+  --color-turf: #2f8f4e;
+  --color-turf-stripe: #298447;
+  --color-endzone: #1d5c39;
+  --color-yard-line: #f4f8f2;
+
+  --color-chart-1: var(--pos-wr);
+  --color-chart-2: var(--success);
+  --color-chart-3: var(--warning);
+  --color-chart-4: var(--pos-rusher);
+  --color-chart-5: var(--danger);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* ---------- Radius ---------- */
+  --radius-sm: calc(var(--radius) * 0.5);
+  --radius-md: calc(var(--radius) * 0.75);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.4);
+  --radius-4xl: 999px;
+
+  /* ---------- Elevation ---------- */
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.25), 0 1px 1px rgb(0 0 0 / 0.1);
+  --shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.25);
+  --shadow-glow: 0 0 0 1px var(--ring), 0 0 24px -4px var(--ring);
+
+  /* ---------- Motion (UI transitions stay between 150 and 300 ms) ---------- */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-pop-in: pop-in 300ms var(--ease-emphasized) both;
+  --animate-slide-up: slide-up 250ms var(--ease-emphasized) both;
+  --animate-fade-in: fade-in 200ms var(--ease-standard) both;
+  --animate-shake: shake 300ms ease-in-out both;
+  --animate-pulse-ring: pulse-ring 1.4s ease-out infinite;
+
+  @keyframes pop-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.96);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes slide-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-4px);
+    }
+    75% {
+      transform: translateX(4px);
+    }
+  }
+  @keyframes pulse-ring {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in srgb, var(--mode-live) 55%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 10px transparent;
+    }
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* ============ Light theme: "Clean light coaching board" ============ */
+:root {
+  --radius: 0.625rem;
+
+  --background: #f3f5f8;
+  --foreground: #0e1726;
+  --surface: #ffffff;
+  --raised: #ffffff;
+  --stage: #dde4ed;
+  --card: #ffffff;
+  --card-foreground: #0e1726;
+  --popover: #ffffff;
+  --popover-foreground: #0e1726;
+  --primary: #166534;
+  --primary-foreground: #ffffff;
+  --secondary: #e8edf3;
+  --secondary-foreground: #0e1726;
+  --muted: #eceff4;
+  --muted-foreground: #475569;
+  --accent: #e3e9f1;
+  --accent-foreground: #0e1726;
+  --border: #d3dae4;
+  --input: #8392a7;
+  --ring: #1d6fd8;
+
+  --success: #047857;
+  --success-soft: #dcf5ea;
+  --warning: #92400e;
+  --warning-soft: #fdf0cf;
+  --danger: #b91c1c;
+  --danger-soft: #fde4e4;
+  --info: #0b5fa5;
+  --info-soft: #dcecfb;
+
+  --mode-view: #0b6bb8;
+  --mode-live: #b45309;
+
+  --team-offense: #0b6bb8;
+  --team-defense: #c2410c;
+  --pos-qb: #f2b705;
+  --pos-wr: #38bdf8;
+  --pos-db: #ff6b3d;
+  --pos-rusher: #d946ef;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #0e1726;
+  --sidebar-primary: #166534;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e8edf3;
+  --sidebar-accent-foreground: #0e1726;
+  --sidebar-border: #d3dae4;
+  --sidebar-ring: #1d6fd8;
+}
+
+/* ============ Dark theme: "Dark broadcast / analytics" (default) ============ */
+.dark {
+  --background: #090d12;
+  --foreground: #e7edf5;
+  --surface: #0f151d;
+  --raised: #172030;
+  --stage: #05080b;
+  --card: #0f151d;
+  --card-foreground: #e7edf5;
+  --popover: #172030;
+  --popover-foreground: #e7edf5;
+  --primary: #b6f23a;
+  --primary-foreground: #0a1004;
+  --secondary: #1a2535;
+  --secondary-foreground: #e7edf5;
+  --muted: #131b26;
+  --muted-foreground: #9db0c6;
+  --accent: #1f2c40;
+  --accent-foreground: #e7edf5;
+  --border: #223044;
+  --input: #3a4c66;
+  --ring: #7cc4ff;
+
+  --success: #3fd68f;
+  --success-soft: rgb(63 214 143 / 0.14);
+  --warning: #ffc233;
+  --warning-soft: rgb(255 194 51 / 0.14);
+  --danger: #ff6b6b;
+  --danger-soft: rgb(255 107 107 / 0.15);
+  --info: #5eb8ff;
+  --info-soft: rgb(94 184 255 / 0.14);
+
+  --mode-view: #5eb8ff;
+  --mode-live: #ffc233;
+
+  --team-offense: #38bdf8;
+  --team-defense: #ff7a4d;
+
+  --sidebar: #0c1218;
+  --sidebar-foreground: #e7edf5;
+  --sidebar-primary: #b6f23a;
+  --sidebar-primary-foreground: #0a1004;
+  --sidebar-accent: #1a2535;
+  --sidebar-accent-foreground: #e7edf5;
+  --sidebar-border: #1c2838;
+  --sidebar-ring: #7cc4ff;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+    color-scheme: light;
+  }
+  html.dark {
+    color-scheme: dark;
+  }
+  body {
+    @apply bg-background text-foreground text-sm antialiased;
+  }
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--primary) 35%, transparent);
+  }
+}
+
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Small uppercase label used for section titles and stat captions. */
+@utility caption-label {
+  font-size: var(--text-caption);
+  line-height: var(--text-caption--line-height);
+  letter-spacing: var(--text-caption--letter-spacing);
+  text-transform: uppercase;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+/* Dense scrollbars for side panels */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+/* Honour reduced-motion: keep state changes, drop movement. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
