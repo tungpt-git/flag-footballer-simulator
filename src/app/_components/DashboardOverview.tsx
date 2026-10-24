@@ -1,10 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowRight, Crosshair, Eye, Gauge, Route as RouteIcon, Users, type LucideIcon } from "lucide-react";
+import { ArrowRight, Crosshair, Eye, Flag, Gauge, Route as RouteIcon, Users, type LucideIcon } from "lucide-react";
 import { PageHeading } from "@/shared/ui/layout/PageHeading";
 import { buttonVariants } from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/ui/utils";
+import { QUESTION_BANK } from "@/modules/officiating";
 import { useRoutes } from "@/modules/playbook/ui";
 import { PositionBadge, usePlayers } from "@/modules/roster/ui";
 import { canPlayPosition, dashToMetersPerSecond } from "@/modules/roster";
@@ -106,6 +107,22 @@ export const DashboardOverview = () => {
             className="border-mode-live/50 bg-mode-live/10 text-mode-live"
             onLaunch={launchSimulator}
           />
+        </section>
+
+        <section aria-labelledby="referee-title" className="flex flex-wrap items-center gap-4 rounded-xl border border-border bg-card p-4">
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-secondary text-primary">
+            <Flag className="size-5" aria-hidden="true" />
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 id="referee-title" className="font-semibold text-foreground">
+              Referee exam
+            </h2>
+            <p className="text-sm text-muted-foreground">{QUESTION_BANK.length} questions on the NFL FLAG playing rules. See your score at the end.</p>
+          </div>
+          <Link href="/referee" className={buttonVariants({ variant: "outline", size: "sm" })}>
+            Take the exam
+            <ArrowRight aria-hidden="true" />
+          </Link>
         </section>
 
         <section aria-label="Summary" className="grid gap-4 sm:grid-cols-3">

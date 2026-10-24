@@ -3,6 +3,7 @@
 import { cn } from "@/shared/ui/utils";
 import {
   ChartColumn,
+  Flag,
   LayoutDashboard,
   PlayCircle,
   Route as RouteIcon,
@@ -20,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/players", label: "Roster", icon: Users },
   { href: "/playbook", label: "Playbook", icon: RouteIcon },
   { href: "/results", label: "Results", icon: ChartColumn },
+  { href: "/referee", label: "Referee", icon: Flag },
 ];
 
 const isActiveRoute = (pathname: string, href: string): boolean =>
@@ -82,7 +84,7 @@ export const MobileTabBar = () => {
       aria-label="Primary"
       className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] md:hidden"
     >
-      <ul className="grid grid-cols-5">
+      <ul className="grid grid-cols-6">
         {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
           const isActive = isActiveRoute(pathname, href);
           return (

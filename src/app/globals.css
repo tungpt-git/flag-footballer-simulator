@@ -17,9 +17,13 @@
  */
 @theme inline {
   /* ---------- Typography ---------- */
-  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --font-display: var(--font-barlow), "Arial Narrow", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --font-sans:
+    var(--font-inter), ui-sans-serif, system-ui, -apple-system, "Segoe UI",
+    sans-serif;
+  --font-display:
+    var(--font-barlow), "Arial Narrow", ui-sans-serif, system-ui, sans-serif;
+  --font-mono:
+    var(--font-jetbrains-mono), ui-monospace, "SFMono-Regular", Menlo, monospace;
   --font-heading: var(--font-sans);
 
   --text-display: 3rem;
@@ -112,7 +116,8 @@
 
   /* ---------- Elevation ---------- */
   --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.25), 0 1px 1px rgb(0 0 0 / 0.1);
-  --shadow-overlay: 0 12px 32px -8px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.25);
+  --shadow-overlay:
+    0 12px 32px -8px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.25);
   --shadow-glow: 0 0 0 1px var(--ring), 0 0 24px -4px var(--ring);
 
   /* ---------- Motion (UI transitions stay between 150 and 300 ms) ---------- */

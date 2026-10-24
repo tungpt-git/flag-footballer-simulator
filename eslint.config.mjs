@@ -2,7 +2,7 @@ import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 
-const MODULES = ["roster", "playbook", "simulation"];
+const MODULES = ["roster", "playbook", "simulation", "officiating"];
 
 /** Frameworks the inner layers must not know about. */
 const FRAMEWORK_PATTERNS = ["react", "react-dom", "next", "next/*", "@/generated/*"];
