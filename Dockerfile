@@ -19,8 +19,9 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
 FROM deps AS builder
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-# Placeholder so route modules can be imported during `next build`; no connection is made.
-# The real DATABASE_URL is injected at runtime and is never baked into the image.
+# `pnpm run build` generates the Prisma client, then compiles. Placeholder URL lets
+# route modules import during `next build`; no connection is made. The real
+# DATABASE_URL is injected at runtime and is never baked into the image.
 RUN --mount=type=cache,target=/app/.next/cache \
     DATABASE_URL="postgresql://build:build@localhost:5432/build" pnpm run build
 
