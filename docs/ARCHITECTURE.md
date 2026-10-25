@@ -24,7 +24,7 @@ Current structure of Flag Football Lab. Scope, event flows, and the first bounda
 | `simulation` | Core | `SimulationState`, `SimulationFrame` | Movement, coverage, pass odds, outcomes, the play store, canvas rendering, session history. Six defensive plays (`defensivePlays.ts`) and the 5-on-5 snap (`teamPlay.ts`) live here |
 | `officiating` | Supporting | `RuleQuestion` | Question bank and exam scoring. No persistence and no link to the other contexts |
 
-Shared kernel (`src/shared/kernel`): `Vec2` and geometry, field dimensions, `DomainError` (including `UnauthorizedError` and `ServiceUnavailableError`), and the activation-key header name.
+Shared kernel (`src/shared/kernel`): `Vec2` and geometry, field dimensions, and `DomainError` (including `UnauthorizedError` and `ServiceUnavailableError`).
 
 ## Context map
 
@@ -74,12 +74,11 @@ src/
 ├── app/                   Next.js routing and composition
 │   ├── page.tsx, players, simulator, playbook, results, referee
 │   └── api/
-│       ├── players        list and get are open; create, update, delete require the activation key
-│       ├── routes         read-only route catalog
-│       └── activation/session   checks a key without writing data
+│       ├── players        read-only; roster writes are Server Actions
+│       └── routes         read-only route catalog
 ├── shared/
-│   ├── kernel/            geometry, field, errors, activation header name
-│   ├── infrastructure/    Prisma client, HTTP mapping, fetch client, activation-key check
+│   ├── kernel/            geometry, field, errors
+│   ├── infrastructure/    Prisma client, HTTP mapping, activation-key check
 │   └── ui/                shell (sidebar, header), shadcn primitives, activation key button
 └── modules/
     ├── roster/
@@ -88,11 +87,11 @@ src/
     └── officiating/
 ```
 
-Next.js route files stay one-liners, for example `export const GET = playerHandlers.list`. The activation session route is the exception: it calls `assertActivationKeyValue` directly because it has no module use case.
+Next.js route files stay one-liners, for example `export const GET = playerHandlers.list`.
 
 ## Access to roster writes
 
-Reads of players and routes are open. Creating, updating, or deleting a player requires header `x-activation-key` (`ACTIVATION_KEY_HEADER`). The server compares it in constant time with `ACTIVATION_KEY`. A missing server key is `ServiceUnavailableError` (503). A missing or wrong client key is `UnauthorizedError` (401). The browser keeps the key in `sessionStorage` under `flag-football.activation-key` and never receives the env value. `POST /api/activation/session` validates a key before the user edits anyone.
+Reads of players and routes happen in Server Components. Creating, updating, or deleting a player is a Server Action. The action reads an httpOnly cookie and rejects the write unless that cookie matches a token derived from `ACTIVATION_KEY`. The unlock action is the only place that compares the key the coach typed; the browser never stores the key. A missing server key is `ServiceUnavailableError`. A missing or wrong key is `UnauthorizedError`. `ActivationAccess` reads the cookie inside `<Suspense>` and passes `isUnlocked` to the header and the roster.
 
 ## Enforced rules (`eslint.config.mjs`)
 

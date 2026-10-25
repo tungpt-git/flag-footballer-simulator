@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { OffensivePlaybook, PlaybookWorkspace } from "@/modules/playbook/ui";
-import { usePlayers } from "@/modules/roster/ui";
 import { DefensePlaybook, useAssignRouteToSimulator, useRunOffensivePlay } from "@/modules/simulation/ui";
 import type { Route } from "@/modules/playbook";
 import { canPlayPosition, type PlayerProfile } from "@/modules/roster";
@@ -12,9 +11,13 @@ import { PlaybookCategoryTabs, type PlaybookCategory } from "./PlaybookCategoryT
 
 const isPlaybookCategory = (value: unknown): value is PlaybookCategory => value === "OFFENSE" || value === "DEFENSE";
 
+type PlaybookScreenProps = {
+  players: PlayerProfile[];
+  routes: Route[];
+};
+
 /** Wires the playbook to the roster and the simulator: offense assigns routes, defense runs defensive plays. */
-export const PlaybookScreen = () => {
-  const { data: players } = usePlayers();
+export const PlaybookScreen = ({ players, routes }: PlaybookScreenProps) => {
   const assignRoute = useAssignRouteToSimulator();
   const runOffensivePlay = useRunOffensivePlay();
   const [category, setCategory] = useState<PlaybookCategory>("OFFENSE");
@@ -36,7 +39,7 @@ export const PlaybookScreen = () => {
         {library === "PLAYS" ? (
           <OffensivePlaybook tabs={tabs} toolbar={librarySwitch} onRun={runOffensivePlay} />
         ) : (
-          <PlaybookWorkspace receivers={receivers} onAssign={handleAssign} tabs={tabs} toolbar={librarySwitch} />
+          <PlaybookWorkspace routes={routes} receivers={receivers} onAssign={handleAssign} tabs={tabs} toolbar={librarySwitch} />
         )}
       </TabsContent>
       <TabsContent value="DEFENSE">

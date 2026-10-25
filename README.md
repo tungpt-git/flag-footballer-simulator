@@ -48,13 +48,13 @@ src/
 │   └── api/players, api/routes   one-line route files wired to module handlers
 ├── shared/
 │   ├── kernel/              Vec2 + geometry, field dimensions, domain errors, Tone
-│   ├── infrastructure/      Prisma client, HTTP response mapping, JSON fetch client
+│   ├── infrastructure/      Prisma client, HTTP response mapping, activation-key check
 │   └── ui/                  layout shell, shadcn primitives, design tokens in globals.css, hooks
 └── modules/
     ├── roster/              Player CRUD (supporting)
     │   ├── domain/          PlayerProfile, Zod invariants, repository port, errors, athletics
     │   ├── application/     playerUseCases
-    │   ├── infrastructure/  prismaPlayerRepository, playerApiClient
+    │   ├── infrastructure/  prismaPlayerRepository
     │   └── presentation/    API handlers, form, hooks, UI
     ├── playbook/            Routes (supporting)
     │   ├── domain/          Route, route templates, cut detection, alignment mirroring

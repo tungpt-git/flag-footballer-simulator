@@ -1,6 +1,8 @@
-import { createHash, timingSafeEqual } from "node:crypto";
-import { ACTIVATION_KEY_HEADER } from "@/shared/kernel/activationAccess";
+import { createHmac, createHash, timingSafeEqual } from "node:crypto";
 import { ServiceUnavailableError, UnauthorizedError } from "@/shared/kernel/errors";
+
+/** httpOnly cookie set after the activation key is checked on the server. */
+export const ACTIVATION_COOKIE_NAME = "ff-activation";
 
 const digest = (value: string): Buffer => createHash("sha256").update(value, "utf8").digest();
 
@@ -22,7 +24,15 @@ export const assertActivationKeyValue = (provided: string | null | undefined): v
   }
 };
 
-/** Reads the activation key from the request header and checks it against the server secret. */
-export const assertActivationKeyHeader = (request: Request): void => {
-  assertActivationKeyValue(request.headers.get(ACTIVATION_KEY_HEADER));
+/** Proof stored in the activation cookie. It is derived from the server secret and is not the key itself. */
+export const createActivationSessionToken = (): string =>
+  createHmac("sha256", configuredKey()).update("ff-activation-session").digest("base64url");
+
+/** True when `value` is the token for the currently configured activation key. */
+export const activationCookieMatches = (value: string | undefined): boolean => {
+  if (!value) return false;
+  const expected = Buffer.from(createActivationSessionToken());
+  const provided = Buffer.from(value);
+  if (provided.length !== expected.length) return false;
+  return timingSafeEqual(provided, expected);
 };

@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
+import { Suspense } from "react";
 import Link from "next/link";
 import { ThemeToggle } from "@/shared/ui/ThemeToggle";
-import { ActivationKeyButton } from "@/shared/ui/layout/ActivationKeyButton";
+import { ActivationAccess } from "@/shared/ui/layout/ActivationAccess";
 
 const LogoMark = () => (
   <svg viewBox="84 207 1531 492" className="h-7 w-auto fill-primary" aria-hidden="true">
@@ -37,7 +38,9 @@ export const AppHeader = ({ modeSwitcher }: AppHeaderProps) => (
     <div className="flex items-center gap-2">
       {modeSwitcher}
       <ThemeToggle />
-      <ActivationKeyButton />
+      <Suspense fallback={<span aria-hidden="true" className="size-8 shrink-0 rounded-full bg-secondary" />}>
+        <ActivationAccess />
+      </Suspense>
     </div>
   </header>
 );

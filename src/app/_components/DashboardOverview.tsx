@@ -6,9 +6,8 @@ import { PageHeading } from "@/shared/ui/layout/PageHeading";
 import { buttonVariants } from "@/shared/ui/primitives/button";
 import { cn } from "@/shared/ui/utils";
 import { QUESTION_BANK } from "@/modules/officiating";
-import { useRoutes } from "@/modules/playbook/ui";
-import { PositionBadge, usePlayers } from "@/modules/roster/ui";
-import { canPlayPosition, dashToMetersPerSecond } from "@/modules/roster";
+import { PositionBadge } from "@/modules/roster/ui";
+import { canPlayPosition, dashToMetersPerSecond, type PlayerProfile } from "@/modules/roster";
 import { SessionSummary, useLaunchSimulator } from "@/modules/simulation/ui";
 
 type SimulationMode = Parameters<ReturnType<typeof useLaunchSimulator>>[0];
@@ -63,15 +62,16 @@ const ModeCard = ({ mode, icon: Icon, title, description, cta, className, onLaun
   );
 };
 
-export const DashboardOverview = () => {
-  const { data: players, isLoading: isLoadingPlayers, errorMessage: playersError } = usePlayers();
-  const { data: routes, isLoading: isLoadingRoutes, errorMessage: routesError } = useRoutes();
-  const launchSimulator = useLaunchSimulator();
-  const isLoading = isLoadingPlayers || isLoadingRoutes;
-  const errorMessage = playersError ?? routesError;
+type DashboardOverviewProps = {
+  players: PlayerProfile[];
+  routeCount: number;
+};
 
-  const byDashTime = (first: (typeof players)[number], second: (typeof players)[number]): number =>
-    first.metrics.fortyYardDash - second.metrics.fortyYardDash;
+const byDashTime = (first: PlayerProfile, second: PlayerProfile): number => first.metrics.fortyYardDash - second.metrics.fortyYardDash;
+
+export const DashboardOverview = ({ players, routeCount }: DashboardOverviewProps) => {
+  const launchSimulator = useLaunchSimulator();
+
   const fastest = [...players].sort(byDashTime)[0];
   const receivers = players.filter((player) => canPlayPosition(player, "WR"));
   const topReceivers = [...receivers].sort(byDashTime).slice(0, 5);
@@ -81,13 +81,6 @@ export const DashboardOverview = () => {
       <PageHeading eyebrow="Team" title="Dashboard" description="Pick a mode, run a play, and learn from the result." />
 
       <div className="flex flex-col gap-6 px-4 pb-8 md:px-8">
-        {errorMessage && (
-          <div role="alert" className="rounded-xl border border-danger/50 border-l-4 border-l-danger bg-danger-soft p-4 text-sm">
-            <p className="font-semibold text-foreground">Could not load data</p>
-            <p className="text-muted-foreground">{errorMessage}. Is the database running (docker compose up -d)?</p>
-          </div>
-        )}
-
         <section aria-label="Choose a mode" className="grid gap-4 md:grid-cols-2">
           <ModeCard
             mode="VIEW"
@@ -126,8 +119,8 @@ export const DashboardOverview = () => {
         </section>
 
         <section aria-label="Summary" className="grid gap-4 sm:grid-cols-3">
-          <StatTile icon={Users} label="Players" value={isLoading ? "-" : String(players.length)} detail={`${receivers.length} receivers on the roster`} />
-          <StatTile icon={RouteIcon} label="Routes" value={isLoading ? "-" : String(routes.length)} detail="Slant, Out, Go, Hook, Post" />
+          <StatTile icon={Users} label="Players" value={String(players.length)} detail={`${receivers.length} receivers on the roster`} />
+          <StatTile icon={RouteIcon} label="Routes" value={String(routeCount)} detail="Slant, Out, Go, Hook, Post" />
           <StatTile
             icon={Gauge}
             label="Fastest 40"
@@ -147,7 +140,7 @@ export const DashboardOverview = () => {
               </Link>
             </div>
             <div className="p-2">
-              {topReceivers.length === 0 && <p className="p-2 text-sm text-muted-foreground">{isLoading ? "Loading..." : "No receivers yet."}</p>}
+              {topReceivers.length === 0 && <p className="p-2 text-sm text-muted-foreground">No receivers yet.</p>}
               <ol>
                 {topReceivers.map((player, index) => (
                   <li key={player.id} className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-muted/60">

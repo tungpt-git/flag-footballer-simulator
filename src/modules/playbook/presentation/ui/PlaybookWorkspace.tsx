@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import { AlertCircle, ArrowRight, RotateCw, Search, SearchX } from "lucide-react";
+import { ArrowRight, Search, SearchX } from "lucide-react";
 import type { PlayerProfile } from "@/modules/roster";
 import { PageHeading } from "@/shared/ui/layout/PageHeading";
 import { Badge } from "@/shared/ui/primitives/badge";
@@ -11,10 +11,11 @@ import { LabeledSelect } from "@/shared/ui/primitives/labeled-select";
 import { cn } from "@/shared/ui/utils";
 import type { Route } from "../../domain/route";
 import { ROUTE_BLURBS, getRouteFacts } from "../routeMetrics";
-import { useRoutes } from "../useRoutes";
 import { RouteThumbnail } from "./RouteThumbnail";
 
 type PlaybookWorkspaceProps = {
+  /** Route catalog loaded by the server. */
+  routes: Route[];
   /** Wide receivers available for assignment. */
   receivers: PlayerProfile[];
   /** Called when a route is assigned to a receiver (the host decides what that means, e.g. open the simulator). */
@@ -80,8 +81,7 @@ const RouteCard = ({ route, receivers, onAssign }: RouteCardProps) => {
   );
 };
 
-export const PlaybookWorkspace = ({ receivers, onAssign, tabs, toolbar }: PlaybookWorkspaceProps) => {
-  const { data: routes, isLoading, errorMessage, refresh } = useRoutes();
+export const PlaybookWorkspace = ({ routes, receivers, onAssign, tabs, toolbar }: PlaybookWorkspaceProps) => {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<RouteFilter>("ALL");
 
@@ -103,28 +103,6 @@ export const PlaybookWorkspace = ({ receivers, onAssign, tabs, toolbar }: Playbo
   };
 
   const renderBody = () => {
-    if (isLoading) {
-      return (
-        <div role="status" aria-label="Loading routes" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
-          {Array.from({ length: 5 }, (_, index) => (
-            <div key={index} className="h-96 animate-pulse rounded-xl border border-border bg-card" />
-          ))}
-        </div>
-      );
-    }
-    if (errorMessage) {
-      return (
-        <div role="alert" className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-xl border border-dashed border-border px-6 py-14 text-center">
-          <AlertCircle className="size-8 text-danger" aria-hidden="true" />
-          <h2 className="text-heading font-semibold">Could not load the playbook</h2>
-          <p className="text-sm text-muted-foreground">{errorMessage}. Is the database running (docker compose up -d)?</p>
-          <Button variant="outline" onClick={refresh}>
-            <RotateCw aria-hidden="true" />
-            Try again
-          </Button>
-        </div>
-      );
-    }
     if (visibleRoutes.length === 0) {
       return (
         <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-xl border border-dashed border-border px-6 py-14 text-center">
@@ -153,7 +131,7 @@ export const PlaybookWorkspace = ({ receivers, onAssign, tabs, toolbar }: Playbo
       <PageHeading
         eyebrow="Team"
         title="Playbook"
-        count={isLoading ? undefined : routes.length}
+        count={routes.length}
         description="Route library. Yellow diamonds mark cuts; blue dot is the receiver at the line of scrimmage."
       />
       <div className="flex flex-col gap-4 px-4 pb-8 md:px-8">

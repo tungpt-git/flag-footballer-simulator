@@ -12,7 +12,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/shared/ui/primitives/dialog";
-import { deletePlayer } from "../../infrastructure/playerApiClient";
+import { openActivationDialog } from "@/shared/ui/activation/activationSession";
+import { deletePlayerAction } from "../playerActions";
 import type { PlayerProfile } from "../../domain/player";
 
 type DeletePlayerDialogProps = {
@@ -32,7 +33,12 @@ export const DeletePlayerDialog = ({ player, onClose, onDeleted }: DeletePlayerD
     if (!player) return;
     setIsDeleting(true);
     try {
-      await deletePlayer(player.id);
+      const result = await deletePlayerAction(player.id);
+      if (!result.ok) {
+        if (result.unauthorized) openActivationDialog();
+        toast.error(result.message);
+        return;
+      }
       toast.success(`Deleted ${player.name}`);
       onDeleted();
       onClose();

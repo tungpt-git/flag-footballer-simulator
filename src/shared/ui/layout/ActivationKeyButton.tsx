@@ -1,15 +1,11 @@
 "use client";
 
-import { requestJson } from "@/shared/infrastructure/http/httpClient";
+import { lockActivation, unlockActivation } from "@/shared/infrastructure/auth/activationActions";
 import {
-  clearActivationKey,
   closeActivationDialog,
   getActivationDialogOpen,
-  getActivationKey,
   openActivationDialog,
-  saveActivationKey,
   subscribeActivationDialog,
-  subscribeActivationKey,
 } from "@/shared/ui/activation/activationSession";
 import { Button } from "@/shared/ui/primitives/button";
 import {
@@ -34,18 +30,14 @@ import {
 } from "react";
 import { toast } from "sonner";
 
-export const ActivationKeyButton = () => {
-  const activationKey = useSyncExternalStore(
-    subscribeActivationKey,
-    getActivationKey,
-    () => null,
-  );
+type ActivationKeyButtonProps = { isUnlocked: boolean };
+
+export const ActivationKeyButton = ({ isUnlocked }: ActivationKeyButtonProps) => {
   const isDialogOpen = useSyncExternalStore(
     subscribeActivationDialog,
     getActivationDialogOpen,
     () => false,
   );
-  const isUnlocked = Boolean(activationKey);
   const [draft, setDraft] = useState("");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -85,11 +77,11 @@ export const ActivationKeyButton = () => {
     setIsSubmitting(true);
     setErrorMessage(null);
     try {
-      await requestJson("/api/activation/session", {
-        method: "POST",
-        body: JSON.stringify({ key }),
-      });
-      saveActivationKey(key);
+      const result = await unlockActivation(key);
+      if (!result.ok) {
+        setErrorMessage(result.message);
+        return;
+      }
       toast.success("Roster editing is unlocked");
       closeActivationDialog();
     } catch (error) {
@@ -103,10 +95,17 @@ export const ActivationKeyButton = () => {
     }
   };
 
-  const handleLock = (): void => {
-    clearActivationKey();
-    toast.success("Roster editing is locked");
-    closeActivationDialog();
+  const handleLock = async (): Promise<void> => {
+    setIsSubmitting(true);
+    try {
+      await lockActivation();
+      toast.success("Roster editing is locked");
+      closeActivationDialog();
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "Could not lock editing");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -141,7 +140,7 @@ export const ActivationKeyButton = () => {
               <DialogTitle>Activation key</DialogTitle>
               <DialogDescription>
                 {isUnlocked
-                  ? "Roster editing is unlocked in this browser tab. Enter a new activation key to replace it, or lock editing."
+                  ? "Roster editing is unlocked in this browser. Enter a new activation key to replace it, or lock editing."
                   : "Enter the activation key to create, edit, or delete players."}
               </DialogDescription>
             </DialogHeader>

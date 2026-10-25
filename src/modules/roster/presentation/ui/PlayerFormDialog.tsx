@@ -28,10 +28,8 @@ import {
   type PlayerProfile,
   type Position,
 } from "../../domain/player";
-import {
-  createPlayer,
-  updatePlayer,
-} from "../../infrastructure/playerApiClient";
+import { openActivationDialog } from "@/shared/ui/activation/activationSession";
+import { createPlayerAction, updatePlayerAction } from "../playerActions";
 import { POSITION_LABELS, getMetricLabels } from "../labels";
 import { dashToScore, type MetricScores } from "../metricScores";
 import {
@@ -131,8 +129,12 @@ const PlayerForm = ({
     setSubmitError(null);
     try {
       const input = toPlayerInput(values);
-      if (player) await updatePlayer(player.id, input);
-      else await createPlayer(input);
+      const result = player ? await updatePlayerAction(player.id, input) : await createPlayerAction(input);
+      if (!result.ok) {
+        if (result.unauthorized) openActivationDialog();
+        setSubmitError(result.message);
+        return;
+      }
       toast.success(
         player ? `Updated ${input.name}` : `Added ${input.name} to the roster`,
       );

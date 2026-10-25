@@ -1,7 +1,7 @@
 "use client";
 
-import { useRoutes } from "@/modules/playbook/ui";
-import { usePlayers } from "@/modules/roster/ui";
+import type { Route } from "@/modules/playbook";
+import type { PlayerProfile } from "@/modules/roster";
 import {
   DESKTOP_QUERY,
   TABLET_QUERY,
@@ -15,13 +15,7 @@ import {
   DialogTitle,
 } from "@/shared/ui/primitives/dialog";
 import { cn } from "@/shared/ui/utils";
-import {
-  Activity,
-  AlertCircle,
-  Loader2,
-  Radio,
-  SlidersHorizontal,
-} from "lucide-react";
+import { Activity, Radio, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { startSessionRecording } from "../../application/sessionHistoryStore";
@@ -110,20 +104,12 @@ const MobilePanels = ({ tabs }: MobilePanelsProps) => {
   );
 };
 
-export const SimulatorWorkspace = () => {
-  const {
-    data: players,
-    isLoading: isLoadingPlayers,
-    errorMessage: playersError,
-  } = usePlayers();
-  const {
-    data: routes,
-    isLoading: isLoadingRoutes,
-    errorMessage: routesError,
-  } = useRoutes();
-  const isLoading = isLoadingPlayers || isLoadingRoutes;
-  const errorMessage = playersError ?? routesError;
+type SimulatorWorkspaceProps = {
+  players: PlayerProfile[];
+  routes: Route[];
+};
 
+export const SimulatorWorkspace = ({ players, routes }: SimulatorWorkspaceProps) => {
   const loadCatalog = useSimulationStore((state) => state.loadCatalog);
   const pause = useSimulationStore((state) => state.pause);
   const hasSimulation = useSimulationStore((state) => state.sim !== null);
@@ -134,45 +120,11 @@ export const SimulatorWorkspace = () => {
   const [sideTab, setSideTab] = useState<StagePanelTab>("live");
 
   useEffect(() => {
-    if (isLoading || errorMessage) return;
     loadCatalog(players, routes);
-  }, [isLoading, errorMessage, players, routes, loadCatalog]);
+  }, [players, routes, loadCatalog]);
 
   useEffect(() => startSessionRecording(), []);
   useEffect(() => pause, [pause]);
-
-  if (isLoading) {
-    return (
-      <div
-        className="flex items-center gap-2 p-6 text-sm text-muted-foreground"
-        role="status"
-      >
-        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-        Loading players and routes...
-      </div>
-    );
-  }
-
-  if (errorMessage) {
-    return (
-      <div
-        role="alert"
-        className="m-6 flex gap-3 rounded-xl border border-danger/50 border-l-4 border-l-danger bg-danger-soft p-4 text-sm"
-      >
-        <AlertCircle
-          className="mt-0.5 size-5 shrink-0 text-danger"
-          aria-hidden="true"
-        />
-        <div>
-          <p className="font-semibold text-foreground">Could not load data</p>
-          <p className="text-muted-foreground">
-            {errorMessage}. Is the database running (docker compose up -d) and
-            seeded (npm run db:seed)?
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   const sideTabs = isDesktop ? DESKTOP_TABS : TABLET_TABS;
   const activeSideTab = sideTabs.includes(sideTab) ? sideTab : sideTabs[0];

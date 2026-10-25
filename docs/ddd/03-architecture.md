@@ -45,7 +45,7 @@ src/
 ├── app/                 Next.js routing and composition only (pages, layout, api route files)
 ├── shared/
 │   ├── kernel/          geometry, field, errors, tone
-│   ├── infrastructure/  Prisma client, HTTP response mapping, JSON fetch client
+│   ├── infrastructure/  Prisma client, HTTP response mapping, activation-key check
 │   └── ui/              layout shell, shadcn primitives, hooks, formatting
 └── modules/
     ├── roster/
